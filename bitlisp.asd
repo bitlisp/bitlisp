@@ -5,5 +5,6 @@
   :components
   ((:file "package")
    (:file "symbols")
+   (:file "reader")
    (:file "environments")
-   (:file "reader")))
+   (:file "types")))

@@ -111,6 +111,6 @@
                     (unread-char char stream)
                     (return (values 'symbol (make-bl-symbol (buffer-atom stream))))))))
 
-(defun cla-read (&optional (stream *standard-input*))
+(defun bl-read (&optional (stream *standard-input*))
   (with-input-from-string (s (buffer-sexp stream))
    (parse-with-lexer (curry #'lexer s) *parser*)))

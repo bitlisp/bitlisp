@@ -5,8 +5,7 @@
    (id :initarg :id :reader id)))
 
 (defmethod print-object ((symbol bl-symbol) stream)
-  (print-unreadable-object (symbol stream :type t)
-    (format stream "~D ~A" (id symbol) (name symbol))))
+  (princ (name symbol) stream))
 
 (defvar *symbol-name-table* (make-hash-table :test 'equal))
 
