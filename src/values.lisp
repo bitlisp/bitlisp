@@ -7,11 +7,20 @@
    (bl-type :initarg :bl-type :reader bl-type)
    (llvm :initarg :llvm :reader llvm)))
 
+(defclass place ()
+  ((bl-type :initarg :bl-type :reader bl-type)
+   (llvm :initarg :llvm :accessor llvm)))
+
 (defclass special-op ()
-  ((resolver :initarg :resolver :reader resolver)
+  ((name :initarg :name :reader name)
+   (resolver :initarg :resolver :reader resolver)
    (typer :initarg :typer :reader typer)
    (constrainer :initarg :constrainer :reader constrainer)
    (compiler :initarg :compiler :reader compiler)))
+
+(defmethod print-object ((obj special-op) stream)
+  (print-unreadable-object (obj stream)
+    (format stream "OP ~A" (name obj))))
 
 (defclass type-constructor ()
   ((func :initarg :func :reader func)))

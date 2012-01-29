@@ -7,4 +7,6 @@
    (:file "symbols")
    (:file "reader")
    (:file "environments")
-   (:file "types")))
+   (:file "types")
+   (:file "values")
+   (:file "typechecking")))
