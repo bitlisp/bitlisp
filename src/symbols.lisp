@@ -21,3 +21,5 @@
                                    :id (fill-pointer *symbol-id-table*))))
         (vector-push-extend symbol *symbol-id-table*)
         (setf (gethash (name symbol) *symbol-name-table*) symbol))))
+
+(defun sym (name) (make-bl-symbol name))
