@@ -9,4 +9,6 @@
    (:file "environments")
    (:file "types")
    (:file "values")
-   (:file "typechecking")))
+   (:file "ast")
+   (:file "unification")
+   (:file "primitives")))

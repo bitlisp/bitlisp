@@ -16,7 +16,8 @@
   `(bind *core-env* (make-bl-symbol ,name)
          (make-instance 'value :type ,type)))
 
-(defprimfun "word+" (make-instance 'function-type
-                                   :return-type (lookup (sym "Word"))
-                                   :arg-types (list (lookup (sym "Word"))
-                                                    (lookup (sym "Word")))))
+(defprimfun "word+" (make-instance 'constructed-type
+                                   ;; TODO: Real function constructor
+                                   :constructor :func
+                                   :args (let ((ty (lookup (sym "Word"))))
+                                           (list ty ty ty))))

@@ -1,21 +1,29 @@
 (in-package #:bitlisp)
 
-(defgeneric free-vars (type))
-(defgeneric conrete-type (type))
-(defgeneric bl-type= (a b))
-
-(defmethod free-vars ((type t))
-  nil)
-(defmethod bl-type= ((a t) (b t))
-  (eql a b))
+(defgeneric free-vars (type)
+  (:method ((type t))
+    nil))
+(defgeneric bl-type= (a b)
+  (:method ((a t) (b t))
+    (eql a b)))
+(defmethod subst-apply (substitution (type t))
+  (loop :for (var . value) :in substitution
+        :do (when (bl-type= var type)
+              (setf type value)))
+  type)
 
 (defun concrete-type (type)
   (null (free-vars type)))
 
-(defclass simple-type ()
+(defun typevar? (x)
+  (integerp x))
+
+(defclass bl-type () ())
+
+(defclass simple-type (bl-type)
   ((llvm :initarg :llvm :reader llvm)))
 
-(defclass machine-int ()
+(defclass machine-int (bl-type)
   ((bits :initarg :bits :reader bits)
    (signed :initarg :signed :reader signed)))
 
@@ -30,18 +38,23 @@
   (and (= (bits a) (bits b))
        (eq (signed a) (signed b))))
 
-(defclass function-type ()
-  ((arg-types :initarg :arg-types :accessor arg-types)
-   (return-type :initarg :return-type :accessor return-type)))
+(defclass constructed-type (bl-type)
+  ((constructor :initarg :constructor :accessor constructor)
+   (args :initarg :args :accessor args)))
 
-(defmethod free-vars ((type function-type))
-  (append (free-vars (return-type type))
-	  (mapcar #'free-vars (arg-types type))))
+(defmethod free-vars ((type constructed-type))
+  (append (free-vars (constructor type))
+	  (mapcar #'free-vars (args type))))
 
-(defmethod bl-type= ((a function-type) (b function-type))
-  (and (every #'bl-type= (arg-types a) (arg-types b))
-       (bl-type= (return-type a) (return-type b))))
+(defmethod bl-type= ((a constructed-type) (b constructed-type))
+  (and (bl-type= (constructor a) (constructor b))
+       (every #'bl-type= (args a) (args b))))
 
-(defmethod print-object ((type function-type) stream)
+(defmethod print-object ((type constructed-type) stream)
   (print-unreadable-object (type stream :type t)
-    (format stream "~{~A~^ ~} -> ~A" (arg-types type) (return-type type))))
+    (format stream "(~A~{ ~A~})" (constructor type) (args type))))
+
+(defmethod subst-apply (substitution (type constructed-type))
+  (setf (constructor type) (subst-apply substitution (constructor type)))
+  (map-into (args type) (curry 'subst-apply substitution) (args type))
+  type)

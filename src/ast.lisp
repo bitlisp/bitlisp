@@ -3,8 +3,27 @@
 (defclass form ()
   ((type :initarg :type :initform nil :accessor type)))
 
-;;; Takes a form, assigns type vars to the form and all children,
-;;; and returns constraint set in the domain of those vars.
+(defmethod print-object :around ((form form) stream)
+  (print-unreadable-object (form stream :type t)
+    (if (type form)
+        (progn
+          (format stream "(the ~A " (type form))
+          (call-next-method)
+          (princ ")" stream))
+        (call-next-method))))
+
+(defgeneric subst-apply (substitution thing)
+  (:documentation "Applies SUBSTITUTION to all types in THING.")
+  (:method (substitution (thing form))
+    (setf (type thing) (subst-apply substitution (type thing)))))
+
+;;; Unification vars are represented as ints for now
+(defun make-vargen ()
+  (let ((x 0))
+    (lambda () (prog1 x (incf x)))))
+
+;;; Takes a form, assigns type vars to the form and all children, and
+;;; returns constraint set in the domain of those vars.
 (defgeneric constraint-gen (var-generator form)
   ;; FIXME: This probably shouldn't be necessary.
   (:method (var-generator (form t))
@@ -13,6 +32,9 @@
 
 (defclass variable (form)
   ((symbol :initarg :symbol :accessor symbol)))
+
+(defmethod print-object ((var variable) stream)
+  (princ (symbol var) stream))
 
 (defmethod constraint-gen (var-generator (form variable))
   (unless (type form)
@@ -23,13 +45,20 @@
   ((operator :initarg :operator :accessor operator)
    (args :initarg :args :accessor args)))
 
+(defmethod print-object ((app application) stream)
+  (format stream "(~A ~{~A~^ ~})" (operator app) (args app)))
+
 (defmethod constraint-gen (var-generator (form application))
   (let ((constraints (append (constraint-gen var-generator (operator form))
                              (mapcan (curry #'constraint-gen var-generator) (args form))))
         (optype (type (operator form))))
-    (check-type optype function-type)
-    (setf (type form) (return-type optype))
-    (nconc (mapcar #'cons (arg-types optype) (mapcar #'type (args form)))
+    (check-type optype constructed-type)
+    ;; TODO: Real function constructor
+    (assert (eq :func (constructor optype)) ()
+            "~A (of type ~A) cannot be used as a function."
+            (operator form) optype)
+    (setf (type form) (first (args optype)))
+    (nconc (mapcar #'cons (rest (args optype)) (mapcar #'type (args form)))
            constraints)))
 
 (defclass abstraction (form)
@@ -37,16 +66,25 @@
    (body :initarg :body :accessor body)
    (env :initarg :env :accessor env)))
 
+(defmethod print-object ((abs abstraction) stream)
+  (format stream "(lambda ~A ~{~A~})" (params abs) (body abs)))
+
 (defmethod constraint-gen (var-generator (form abstraction))
   (prog1 (mapcan (curry #'constraint-gen var-generator) (body form))
-    (setf (type form) (make-instance 'function-type
-                                     :return-type (type (car (last (body form))))
-                                     :arg-types (mapcar #'type (params form))))))
+    (setf (type form) (make-instance 'constructed-type
+                                     ;; TODO: Real function constructor
+                                     :constructor :func
+                                     :args (list* (type (car (last (body form))))
+                                                  (mapcar #'type (params form)))))
+    nil))
 
 (defclass conditional (form)
   ((condition :initarg :condition :accessor condition)
    (then :initarg :then :accessor then)
    (else :initarg :else :accessor else)))
+
+(defmethod print-object ((con conditional) stream)
+  (format stream "(if ~A ~A ~A)" (condition con) (then con) (else con)))
 
 (defmethod constraint-gen (var-generator (form conditional))
   (let ((constraints (nconc (constraint-gen var-generator (condition form))
@@ -59,6 +97,9 @@
 
 (defclass literal (form)
   ((value :initarg :value :accessor value)))
+
+(defmethod print-object ((lit literal) stream)
+  (princ (value lit) stream))
 
 ;;; TODO: Polymorphic literals
 (defmethod constraint-gen (var-generator (form literal))
