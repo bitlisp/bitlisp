@@ -50,8 +50,8 @@
        (eq (signed a) (signed b))))
 
 (defclass constructed-type (bl-type)
-  ((constructor :initarg :constructor :accessor constructor)
-   (args :initarg :args :accessor args)))
+  ((constructor :initarg :constructor :reader constructor)
+   (args :initarg :args :reader args)))
 
 (defmethod free-vars ((type constructed-type))
   (remove-duplicates
@@ -79,9 +79,9 @@
                  :args (list* return-type arg-types)))
 
 (defclass quantified-type (bl-type)
-  ((variables :initarg :variables :accessor variables)
-   (constraints :initarg :constraints :accessor constraints)
-   (inner-type :initarg :inner-type :accessor inner-type)))
+  ((variables :initarg :variables :reader variables)
+   (constraints :initarg :constraints :reader constraints)
+   (inner-type :initarg :inner-type :reader inner-type)))
 
 (defmethod print-object ((type quantified-type) stream)
   (print-unreadable-object (type stream :type t)
