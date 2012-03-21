@@ -2,7 +2,9 @@
 
 (defgeneric free-vars (type)
   (:method ((type t))
-    nil))
+    (if (typevar? type)
+        (list type)
+        nil)))
 (defgeneric bl-type= (a b)
   (:method ((a t) (b t))
     (eql a b)))
@@ -44,8 +46,9 @@
    (args :initarg :args :accessor args)))
 
 (defmethod free-vars ((type constructed-type))
-  (append (free-vars (constructor type))
-	  (mapcar #'free-vars (args type))))
+  (remove-duplicates
+   (nconc (free-vars (constructor type))
+          (reduce (lambda (x a) (nconc a (free-vars x))) (args type)))))
 
 (defmethod bl-type= ((a constructed-type) (b constructed-type))
   (and (bl-type= (constructor a) (constructor b))
