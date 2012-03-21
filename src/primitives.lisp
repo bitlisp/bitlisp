@@ -91,5 +91,8 @@
   `(bind *core-env* (make-bl-symbol ,name)
          (make-instance 'var :name ,name :type ,type)))
 
-(defprimfun "word+" (let ((ty (lookup (sym "Word"))))
+(defprimfun "word+" (let ((ty (lookup "Word")))
                       (make-ftype ty ty ty)))
+
+(defprimfun "word>" (let ((ty (lookup "Word")))
+                      (make-ftype (lookup "Bool") ty ty)))
