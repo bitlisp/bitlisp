@@ -56,7 +56,8 @@
 (defmethod free-vars ((type constructed-type))
   (remove-duplicates
    (nconc (free-vars (constructor type))
-          (reduce (lambda (x a) (nconc a (free-vars x))) (args type)))))
+          (reduce 'nconc (args type)
+                  :key 'free-vars))))
 
 (defmethod bl-type= ((a constructed-type) (b constructed-type))
   (and (bl-type= (constructor a) (constructor b))
