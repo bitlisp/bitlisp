@@ -5,22 +5,24 @@
    (bindings :initform (make-hash-table :test 'eq)
              :initarg :bindings :reader bindings)
    (parents :initform () :initarg :parents :accessor parents)
-   (id :initarg :id :reader id)))
+   (id :initarg :id :reader id)
+   (toplevel? :initarg :toplevel? :accessor toplevel?)))
 
 (defvar *env-id-table* (make-array '(128)
                                    :element-type 'environment
                                    :adjustable t
                                    :fill-pointer 0))
 
-(defun make-env (&key (name "anonymous") parents)
+(defun make-env (&key (name "anonymous") toplevel? parents)
   (let ((obj (make-instance 'environment
                             :id (fill-pointer *env-id-table*)
                             :name name
-                            :parents parents)))
+                            :parents parents
+                            :toplevel? toplevel?)))
     (vector-push-extend obj *env-id-table*)
     obj))
 
-(defvar *core-env* (make-env :name "core"))
+(defvar *core-env* (make-env :name "core" :toplevel t))
 
 (defun lookup (symbol &optional (env *core-env*))
   (when (stringp symbol)

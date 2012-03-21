@@ -12,7 +12,7 @@
 
 (defspecial "lambda" self (args &rest body)
     (env
-      (let ((new-env (make-env :parents (list env)))
+      (let ((new-env (make-env :parents (list env) :toplevel? nil))
             (arg-vars (mapcar (lambda (sym) (make-instance 'var :name sym)) args)))
         (mapc (curry #'bind new-env) args arg-vars)
         (list* self arg-vars
