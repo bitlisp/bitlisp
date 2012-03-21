@@ -50,7 +50,7 @@
 
 (defun resolve (env form)
   "Lower code into internal representations"
-  (typecase form
+  (etypecase form
     (null nil)
     (bl-symbol
      (multiple-value-bind (place exists) (lookup form env)
@@ -64,21 +64,4 @@
 	   ;(macro (error "TODO: Macroexpansion"))
 	   (special-op (apply (special-op-resolver op) env args))
 	   (t (cons op (mapcar (curry #'resolve env) args)))))))
-    (integer
-     (let ((word-type (lookup "word")))
-       (make-instance 'value
-		      :contents form
-		      :bl-type word-type
-		      :llvm (llvm:const-int (llvm word-type) form))))
-    (single-float
-     (let ((float-type (lookup "float")))
-       (make-instance 'value
-		      :contents form
-		      :bl-type float-type
-		      :llvm (llvm:const-real (llvm float-type) form))))
-    (double-float
-     (let ((float-type (lookup "double")))
-       (make-instance 'value
-		      :contents form
-		      :bl-type float-type
-		      :llvm (llvm:const-real (llvm float-type) form))))))
+    ((or integer single-float double-float) form)))
