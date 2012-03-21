@@ -30,8 +30,9 @@
             :finally (return
                        (values
                         (make-form
-                         (make-ftype (form-type (car (last forms)))
-                                     (mapcar #'type args))
+                         (apply #'make-ftype
+                                (form-type (car (last forms)))
+                                (mapcar #'type args))
                          (list* self args (nreverse forms)))
                         (apply #'nconc constraints)))))
     (unifier
