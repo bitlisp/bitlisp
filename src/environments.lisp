@@ -22,7 +22,7 @@
     (vector-push-extend obj *env-id-table*)
     obj))
 
-(defvar *core-env* (make-env :name "core" :toplevel t))
+(defvar *core-env* (make-env :name "core" :toplevel? t))
 
 (defun lookup (symbol &optional (env *core-env*))
   (when (stringp symbol)
