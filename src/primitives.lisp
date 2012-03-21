@@ -56,11 +56,28 @@
              (unif-apply unifier then)
              (unif-apply unifier else))))
 
-
+(defspecial "def" self (name value)
+    (env
+      (let ((var (make-instance 'var :name name)))
+        (bind env name var)
+        (list self var (resolve env value))))
+    (vargen
+      (let ((value-type (funcall vargen)))
+        ;; TODO: Is it even *possible* not to mutate here?
+        (setf (type name) value-type)
+        (multiple-value-bind (vform vcons)
+            (constrain vargen value)
+         (values
+          (make-form (lookup "Unit") (list self name vform))
+          (cons (cons value-type (form-type vform)) vcons)))))
+    (unifier
+      (setf (type name) (subst-apply unifier (type name)))
+      (list self name (unif-apply unifier value))))
 
 (defmacro def-bl-type (name class &rest initargs)
   `(bind *core-env* (make-bl-symbol ,name) (make-instance ',class ,@initargs)))
 
+(def-bl-type "Unit" unit-type)
 (def-bl-type "Float"  simple-type :llvm (llvm:float-type))
 (def-bl-type "Double" simple-type :llvm (llvm:double-type))
 ;;; TODO: 64-bit support

@@ -23,6 +23,14 @@
 
 (defclass bl-type () ())
 
+(defclass unit-type (bl-type) ())
+
+(defmethod print-object ((type unit-type) stream)
+  (print-unreadable-object (type stream :type t)))
+
+(defmethod bl-type= ((a unit-type) (b unit-type))
+  t)
+
 (defclass simple-type (bl-type)
   ((llvm :initarg :llvm :reader llvm)))
 
