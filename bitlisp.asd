@@ -9,6 +9,5 @@
    (:file "environments")
    (:file "types")
    (:file "values")
-   (:file "ast")
    (:file "unification")
    (:file "primitives")))

@@ -7,25 +7,16 @@
    (parents :initform () :initarg :parents :accessor parents)
    (id :initarg :id :reader id)))
 
-(defclass stackframe (environment)
-  ((owner :initarg :owner :reader owner)))
-
 (defvar *env-id-table* (make-array '(128)
                                    :element-type 'environment
                                    :adjustable t
                                    :fill-pointer 0))
 
-(defun make-env (&key (name "anonymous") parents (function nil function-supplied))
-  (let ((obj (if function-supplied
-                 (make-instance 'stackframe
-                                :id (fill-pointer *env-id-table*)
-                                :name name
-                                :parents parents
-                                :owner function)
-                 (make-instance 'environment
-                                :id (fill-pointer *env-id-table*)
-                                :name name
-                                :parents parents))))
+(defun make-env (&key (name "anonymous") parents)
+  (let ((obj (make-instance 'environment
+                            :id (fill-pointer *env-id-table*)
+                            :name name
+                            :parents parents)))
     (vector-push-extend obj *env-id-table*)
     obj))
 
@@ -44,33 +35,33 @@
                            (return (values place t)))))))
       (values nil nil)))
 
-(defun bind (env symbol place)
-  "Associate SYMBOL with storage location PLACE"
+(defun bind (env symbol value)
+  "Associate SYMBOL with VALUE in ENV"
   (check-type symbol bl-symbol)
-  (multiple-value-bind (old-place exists) (gethash symbol (bindings env))
+  (multiple-value-bind (old-value exists) (gethash symbol (bindings env))
     (when exists
-      (warn "Rebinding ~A to ~A (was ~A) in ~A" symbol place old-place env)))
-  (setf (gethash symbol (bindings env)) place))
+      (warn "Rebinding ~A to ~A (was ~A) in ~A" symbol value old-value env)))
+  (setf (gethash symbol (bindings env)) value))
 
 (defun unbind (env symbol)
   (remhash symbol (bindings env)))
 
-(defun resolve (form &optional (env *core-env*))
+(defun resolve (env form)
   "Lower code into internal representations"
   (typecase form
     (null nil)
-    ((or bl-symbol string)
+    (bl-symbol
      (multiple-value-bind (place exists) (lookup form env)
        (if exists
 	   place
 	   (error "~A names no binding" form))))
     (list
      (destructuring-bind (operator &rest args) form
-       (let ((op (resolve operator env)))
+       (let ((op (resolve env operator)))
 	 (typecase op
-	   (macro (error "TODO: Macroexpansion"))
-	   (special-op (apply (resolver op) env args))
-	   (t (cons op (mapcar (rcurry #'resolve env) args)))))))
+	   ;(macro (error "TODO: Macroexpansion"))
+	   (special-op (apply (special-op-resolver op) env args))
+	   (t (cons op (mapcar (curry #'resolve env) args)))))))
     (integer
      (let ((word-type (lookup "word")))
        (make-instance 'value

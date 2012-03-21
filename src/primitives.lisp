@@ -1,5 +1,62 @@
 (in-package #:bitlisp)
 
+(defmacro defspecial (name self args
+                      (env &body resolver)
+                      (vargen &body constrainer)
+                      (unifier &body subst))
+  `(let ((,self (make-special-op :name ,name)))
+     (setf (special-op-resolver ,self) (lambda (,env ,@args) ,@resolver)
+           (special-op-constrainer ,self) (lambda (,vargen ,@args) ,@constrainer)
+           (special-op-subst ,self) (lambda (,unifier ,@args) ,@subst))
+     (bind *core-env* (make-bl-symbol ,name) ,self)))
+
+(defspecial "lambda" self (args &rest body)
+    (env
+      (let ((new-env (make-env :parents (list env)))
+            (arg-vars (mapcar (lambda (sym) (make-instance 'var :name sym)) args)))
+        (mapc (curry #'bind new-env) args arg-vars)
+        (list* self arg-vars
+               (mapcar (curry #'resolve new-env) body))))
+    (vargen
+     ;; TODO: Probably shouldn't mutate here.
+      (mapc (lambda (v) (setf (type v) (funcall vargen))) args)
+      (loop :with constraints := nil
+            :with forms := nil
+            :for form :in body
+            :do (multiple-value-bind (new-form new-constraints)
+                    (constrain vargen form)
+                  (push new-form forms)
+                  (push new-constraints constraints))
+            :finally (return
+                       (values
+                        (make-form
+                         (make-ftype (form-type (car (last forms)))
+                                     (mapcar #'type args))
+                         (list* self args (nreverse forms)))
+                        (apply #'nconc constraints)))))
+    (unifier
+      (list* self args (mapcar (curry 'unif-apply unifier) body))))
+
+(defspecial "if" self (condition then else)
+    (env
+      (list self (resolve env condition)
+            (resolve env then) (resolve env else)))
+    (vargen
+      (multiple-value-bind (cform ccons) (constrain vargen condition)
+        (multiple-value-bind (tform tcons) (constrain vargen then)
+          (multiple-value-bind (eform econs) (constrain vargen else)
+            (values (make-form (form-type tform) (list self cform tform eform))
+                    (nconc (list (cons (form-type tform)
+                                       (form-type eform)))
+                           ccons tcons econs))))))
+    (unifier
+      (list* self
+             (unif-apply unifier condition)
+             (unif-apply unifier then)
+             (unif-apply unifier else))))
+
+
+
 (defmacro def-bl-type (name class &rest initargs)
   `(bind *core-env* (make-bl-symbol ,name) (make-instance ',class ,@initargs)))
 
@@ -14,10 +71,7 @@
 
 (defmacro defprimfun (name type)
   `(bind *core-env* (make-bl-symbol ,name)
-         (make-instance 'value :type ,type)))
+         (make-instance 'var :name ,name :type ,type)))
 
-(defprimfun "word+" (make-instance 'constructed-type
-                                   ;; TODO: Real function constructor
-                                   :constructor :func
-                                   :args (let ((ty (lookup (sym "Word"))))
-                                           (list ty ty ty))))
+(defprimfun "word+" (let ((ty (lookup (sym "Word"))))
+                      (make-ftype ty ty ty)))
