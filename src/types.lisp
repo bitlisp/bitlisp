@@ -64,8 +64,8 @@
        (every #'bl-type= (args a) (args b))))
 
 (defmethod print-object ((type constructed-type) stream)
-  (print-unreadable-object (type stream :type t)
-    (format stream "(~A~{ ~A~})" (constructor type) (args type))))
+  (print-unreadable-object (type stream)
+    (format stream "~A~{ ~A~}" (constructor type) (args type))))
 
 (defmethod subst-apply (substitution (type constructed-type))
   (make-instance 'constructed-type
