@@ -4,11 +4,19 @@
   (let ((resolved (resolve *core-env* code)))
     (multiple-value-bind (form constraints)
         (constrain (make-vargen) resolved)
-      (unif-apply (unify constraints) form))))
+      (destructuring-bind (type . body) (unif-apply (unify constraints) form)
+        (make-form (generalize-type type) body)))))
 
 (defun make-vargen ()
   (let ((x 0))
     (lambda () (prog1 x (incf x)))))
+
+(defun generalize-type (incomplete-type)
+  (if-let (vars (free-vars incomplete-type))
+    (make-instance 'quantified-type
+                   :variables (free-vars incomplete-type)
+                   :inner-type incomplete-type)
+    incomplete-type))
 
 (defun constrain (vargen form)
   (if (atom form)
