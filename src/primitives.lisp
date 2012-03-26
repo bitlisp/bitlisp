@@ -68,7 +68,7 @@
         (multiple-value-bind (vform vcons)
             (constrain vargen value)
          (values
-          (make-form (lookup "Unit") (list self name vform))
+          (make-form (form-type vform) (list self name vform))
           (cons (cons value-type (form-type vform)) vcons)))))
     (unifier
       (setf (type name) (subst-apply unifier (type name)))
