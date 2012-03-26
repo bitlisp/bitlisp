@@ -16,12 +16,12 @@
          (remove-if (lambda (x) (find x gamma :key #'car))
                     sigma)))
 
-(defmethod subst-apply (substitutions (constraints list))
-  (mapcar (curry 'subst-apply substitutions) constraints))
-
-(defmethod subst-apply (substitutions (eq-constraint cons))
-  (cons (subst-apply substitutions (car eq-constraint))
-        (subst-apply substitutions (cdr eq-constraint))))
+(defun subst-constraints (substitutions constraints)
+  (mapcar (lambda (constraint)
+            (destructuring-bind (l . r) constraint
+              (cons (subst-apply substitutions l)
+                    (subst-apply substitutions r))))
+          constraints))
 
 ;;; Returns list of substitutions and quantifiers.
 ;;; TODO: Protocols
@@ -35,12 +35,12 @@
         ((and (typevar? left)
               (not (find left (free-vars right))))
          (let ((subst (make-subst left right)))
-           (subst-compose (unify (subst-apply subst rest))
+           (subst-compose (unify (subst-constraints subst rest))
                           subst)))
         ((and (typevar? right)
               (not (find right (free-vars left))))
          (let ((subst (make-subst right left)))
-           (subst-compose (unify (subst-apply subst rest))
+           (subst-compose (unify (subst-constraints subst rest))
                           subst)))
         ((and (typep left 'constructed-type)
               (typep right 'constructed-type)
