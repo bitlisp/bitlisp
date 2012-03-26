@@ -64,14 +64,14 @@
     (vargen
       (let ((value-type (funcall vargen)))
         ;; TODO: Is it even *possible* not to mutate here?
-        (setf (type name) value-type)
+        (setf (var-type name) value-type)
         (multiple-value-bind (vform vcons)
             (constrain vargen value)
          (values
           (make-form (form-type vform) (list self name vform))
           (cons (cons value-type (form-type vform)) vcons)))))
     (unifier
-      (setf (type name) (subst-apply unifier (type name)))
+      (setf (var-type name) (subst-apply unifier (var-type name)))
       (list self name (unif-apply unifier value))))
 
 (defmacro def-bl-type (name class &rest initargs)
@@ -89,7 +89,7 @@
 
 (defmacro defprimfun (name type)
   `(bind *core-env* (make-bl-symbol ,name)
-         (make-instance 'var :name ,name :type ,type)))
+         (make-instance 'var :name ,name :var-type ,type)))
 
 (defprimfun "word+" (let ((ty (lookup "Word")))
                       (make-ftype ty ty ty)))

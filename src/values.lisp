@@ -8,7 +8,7 @@
 
 (defclass var ()
   ((name :initarg :name :reader name)
-   (type :initarg :type :accessor type)))
+   (var-type :initarg :var-type :accessor var-type)))
 
 (defmethod print-object ((value var) stream)
   (print-unreadable-object (value stream :type t)

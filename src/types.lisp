@@ -80,7 +80,7 @@
 
 (defclass quantified-type (bl-type)
   ((variables :initarg :variables :reader variables)
-   (constraints :initarg :constraints :reader constraints)
+   (constraints :initarg :constraints :initform nil :reader constraints)
    (inner-type :initarg :inner-type :reader inner-type)))
 
 (defmethod print-object ((type quantified-type) stream)
