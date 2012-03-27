@@ -15,7 +15,23 @@
                 (setf thing value)))
     thing))
 
-(defun concrete-type (type)
+(defun subst-constraints (substitutions constraints)
+  (mapcar (lambda (constraint)
+            (destructuring-bind (l . r) constraint
+              (cons (subst-apply substitutions l)
+                    (subst-apply substitutions r))))
+          constraints))
+
+(defun constraint= (a b)
+  "Check that two equality constraints are equal."
+  (check-type a cons)
+  (check-type b cons)
+  (or (and (bl-type= (car a) (car b))
+           (bl-type= (cdr a) (cdr b)))
+      (and (bl-type= (car a) (cdr b))
+           (bl-type= (cdr a) (car b)))))
+
+(defun complete-type (type)
   (null (free-vars type)))
 
 (defun typevar? (x)
@@ -78,29 +94,46 @@
                  :constructor :func
                  :args (list* return-type arg-types)))
 
-(defclass quantified-type (bl-type)
+(defclass universal-type (bl-type)
   ((variables :initarg :variables :reader variables)
    (constraints :initarg :constraints :initform nil :reader constraints)
    (inner-type :initarg :inner-type :reader inner-type)))
 
-(defmethod print-object ((type quantified-type) stream)
+(defmethod print-object ((type universal-type) stream)
   (print-unreadable-object (type stream :type t)
-    (format stream "(forall (~{~A~^ ~}) (~{~A~^ ~}) ~A)"
+    (format stream "(∀ (~{~A~^ ~}) (~{~A~^ ~}) ~A)"
             (variables type) (constraints type) (inner-type type))))
 
-(defmethod free-vars ((type quantified-type))
+(defmethod free-vars ((type universal-type))
   (remove-if (rcurry #'member (variables type))
              (free-vars (inner-type type))))
 
-(defmethod bl-type= ((a quantified-type) (b quantified-type))
+(defmethod bl-type= ((a universal-type) (b universal-type))
   (and (= (length (variables a)) (length (variables b)))
        (let ((subst (reduce 'subst-compose (mapcar 'make-subst
                                                    (variables b) (variables a)))))
-         (every #'constraint= (constraints a) (mapcar #'subst-apply (constraints b)))
+         (every #'constraint= (constraints a) (subst-constraints subst (constraints b)))
          (bl-type= (inner-type a) (subst-apply subst (inner-type b))))))
 
-(defmethod subst-apply (substitution (type quantified-type))
-  (make-instance 'quantified-type
-                 :variables (mapcar (curry 'subst-apply substitution) (variables type))
-                 :constraints (mapcar (curry 'subst-apply substitution) (constraints type))
-                 :inner-type (subst-apply substitution (inner-type type))))
+(defmethod subst-apply (substitution (type universal-type))
+  (declare (ignore substitution))
+  (error "Tried to apply a substitution to ~A" type))
+
+(defclass product-type (bl-type)
+  ((args :initarg :args :reader args)))
+
+(defmethod print-object ((type product-type) stream)
+  (print-unreadable-object (type stream :type t)
+    (format stream "~{~A~^ ~}" (args type))))
+
+(defmethod free-vars ((type product-type))
+  (remove-duplicates (reduce 'nconc (args type)
+                             :key 'free-vars)))
+
+(defmethod bl-type= ((a product-type) (b product-type))
+  (and (= (length (args a)) (length (args b)))
+       (every #'bl-type= (args a) (args b))))
+
+(defmethod subst-apply (substitution (type product-type))
+  (make-instance 'product-type
+                 :args (mapcar (curry 'subst-apply substitution) (args type))))

@@ -12,7 +12,7 @@
 
 (defun generalize-type (incomplete-type)
   (if-let (vars (free-vars incomplete-type))
-    (make-instance 'quantified-type
+    (make-instance 'universal-type
                    :variables (free-vars incomplete-type)
                    :inner-type incomplete-type)
     incomplete-type))

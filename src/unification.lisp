@@ -16,13 +16,6 @@
          (remove-if (lambda (x) (find x gamma :key #'car))
                     sigma)))
 
-(defun subst-constraints (substitutions constraints)
-  (mapcar (lambda (constraint)
-            (destructuring-bind (l . r) constraint
-              (cons (subst-apply substitutions l)
-                    (subst-apply substitutions r))))
-          constraints))
-
 ;;; Returns list of substitutions and quantifiers.
 ;;; TODO: Protocols
 (defun unify (constraints)
