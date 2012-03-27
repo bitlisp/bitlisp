@@ -4,8 +4,7 @@
   (let ((resolved (resolve *core-env* code)))
     (multiple-value-bind (form constraints)
         (constrain (make-vargen) resolved)
-      (destructuring-bind (type . body) (unif-apply (unify constraints) form)
-        (make-form (generalize-type type) body)))))
+      (unif-apply (unify constraints) form))))
 
 (defun make-vargen ()
   (let ((x 0))

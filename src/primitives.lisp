@@ -67,9 +67,10 @@
         (setf (var-type name) value-type)
         (multiple-value-bind (vform vcons)
             (constrain vargen value)
-         (values
-          (make-form (form-type vform) (list self name vform))
-          (cons (cons value-type (form-type vform)) vcons)))))
+          (let ((actual-type (generalize-type (form-type vform))))
+           (values
+            (make-form actual-type (list self name vform))
+            (cons (cons value-type actual-type) vcons))))))
     (unifier
       (setf (var-type name) (subst-apply unifier (var-type name)))
       (list self name (unif-apply unifier value))))
