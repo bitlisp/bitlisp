@@ -20,7 +20,7 @@
 (defun constrain (vargen form)
   (if (atom form)
       (etypecase form
-        (var (make-form (type form) form))
+        (var (make-form (var-type form) form))
         (integer (make-form (lookup "Word") form))
         (single-float (make-form (lookup "Float") form))
         (double-float (make-form (lookup "Double") form)))

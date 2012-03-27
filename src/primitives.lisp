@@ -19,7 +19,7 @@
                (mapcar (curry #'resolve new-env) body))))
     (vargen
      ;; TODO: Probably shouldn't mutate here.
-      (mapc (lambda (v) (setf (type v) (funcall vargen))) args)
+      (mapc (lambda (v) (setf (var-type v) (funcall vargen))) args)
       (loop :with constraints := nil
             :with forms := nil
             :for form :in body
@@ -32,7 +32,7 @@
                         (make-form
                          (apply #'make-ftype
                                 (form-type (car (last forms)))
-                                (mapcar #'type args))
+                                (mapcar #'var-type args))
                          (list* self args (nreverse forms)))
                         (apply #'nconc constraints)))))
     (unifier
