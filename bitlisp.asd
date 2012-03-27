@@ -10,4 +10,5 @@
    (:file "types")
    (:file "values")
    (:file "unification")
+   (:file "typechecking")
    (:file "primitives")))
