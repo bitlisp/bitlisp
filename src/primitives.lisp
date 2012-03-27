@@ -95,5 +95,8 @@
 (defprimfun "word+" (let ((ty (lookup "Word")))
                       (make-ftype ty ty ty)))
 
+(defprimfun "word-" (let ((ty (lookup "Word")))
+                      (make-ftype ty ty ty)))
+
 (defprimfun "word>" (let ((ty (lookup "Word")))
                       (make-ftype (lookup "Bool") ty ty)))
