@@ -100,8 +100,8 @@
    (inner-type :initarg :inner-type :reader inner-type)))
 
 (defmethod print-object ((type universal-type) stream)
-  (print-unreadable-object (type stream :type t)
-    (format stream "(∀ (~{~A~^ ~}) (~{~A~^ ~}) ~A)"
+  (print-unreadable-object (type stream)
+    (format stream "∀ (~{~A~^ ~}) (~{~A~^ ~}) ~A"
             (variables type) (constraints type) (inner-type type))))
 
 (defmethod free-vars ((type universal-type))
