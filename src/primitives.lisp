@@ -67,13 +67,14 @@
         (setf (var-type name) value-type)
         (multiple-value-bind (vform vcons)
             (constrain vargen value)
-          (let ((actual-type (generalize-type (form-type vform))))
-           (values
-            (make-form actual-type (list self name vform))
-            (cons (cons value-type actual-type) vcons))))))
+          (values
+           (make-form (lookup "Unit") (list self name vform))
+           (cons (cons value-type (form-type vform)) vcons)))))
     (unifier
-      (setf (var-type name) (subst-apply unifier (var-type name)))
-      (list self name (unif-apply unifier value))))
+      (let ((final-type (generalize-type (subst-apply unifier (var-type name))))
+            (value-form (unif-apply unifier value)))
+        (setf (var-type name) final-type)
+        (list self name (make-form final-type (form-code value-form))))))
 
 (defmacro def-bl-type (name class &rest initargs)
   `(bind *core-env* (make-bl-symbol ,name) (make-instance ',class ,@initargs)))
