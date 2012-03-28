@@ -20,7 +20,12 @@
 (defun constrain (vargen form)
   (if (atom form)
       (etypecase form
-        (var (make-form (var-type form) form))
+        (var (let ((type (var-type form)))
+               (make-form
+                (typecase type
+                  (universal-type (instantiate type vargen))
+                  (t type))
+                form)))
         (integer (make-form (lookup "Word") form))
         (single-float (make-form (lookup "Float") form))
         (double-float (make-form (lookup "Double") form)))
@@ -49,4 +54,3 @@
                                               (apply #'make-ftype rtype
                                                      (mapcar #'form-type (rest forms)))))
                                   constraints))))))))))
-
