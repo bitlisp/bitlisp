@@ -101,3 +101,11 @@
 
 (defprimfun "word>" (let ((ty (lookup "Word")))
                       (make-ftype (lookup "Bool") ty ty)))
+
+(defprimfun "load" (make-instance 'universal-type
+                                  :variables '(0)
+                                  :inner-type (make-ftype 0 (make-ptr 0))))
+
+(defprimfun "store" (make-instance 'universal-type
+                                   :variables '(0)
+                                   :inner-type (make-ftype 0 (make-ptr 0))))

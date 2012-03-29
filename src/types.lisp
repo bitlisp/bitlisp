@@ -90,9 +90,15 @@
 
 (defun make-ftype (return-type &rest arg-types)
   (make-instance 'constructed-type
-                 ;; TODO: Real function constructor
+                 ;; TODO: Real constructor
                  :constructor :func
                  :args (list* return-type arg-types)))
+
+(defun make-ptr (target-type)
+  (make-instance 'constructed-type
+                 ;; TODO: Real constructor
+                 :constructor :ptr
+                 :args (list target-type)))
 
 (defclass universal-type (bl-type)
   ((variables :initarg :variables :reader variables)
