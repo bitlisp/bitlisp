@@ -121,12 +121,13 @@
          (every #'constraint= (constraints a) (subst-constraints subst (constraints b)))
          (bl-type= (inner-type a) (subst-apply subst (inner-type b))))))
 
-(defun instantiate (universal-type vargen)
-  (when (constraints universal-type)
-    (error "Constraint inference is unimplemented"))
-  (subst-apply (mapcar (lambda (x) (cons x (funcall vargen)))
-                       (variables universal-type))
-               (inner-type universal-type)))
+(defun instantiate-type (universal-type vargen)
+  (check-type universal-type universal-type)
+  (let ((subst (mapcar (lambda (x) (cons x (funcall vargen)))
+                       (variables universal-type))))
+    (values (subst-apply subst
+                         (inner-type universal-type))
+            (subst-constraints subst (constraints universal-type)))))
 
 (defmethod subst-apply (substitution (type universal-type))
   (declare (ignore substitution))

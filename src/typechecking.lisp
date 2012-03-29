@@ -21,11 +21,13 @@
   (if (atom form)
       (etypecase form
         (var (let ((type (var-type form)))
-               (make-form
-                (typecase type
-                  (universal-type (instantiate type vargen))
-                  (t type))
-                form)))
+               (typecase type
+                  (universal-type
+                   (multiple-value-bind (local-type constraints)
+                       (instantiate-type type vargen)
+                     (values (make-form local-type (form-code form))
+                             constraints)))
+                  (t form))))
         (integer (make-form (lookup "Word") form))
         (single-float (make-form (lookup "Float") form))
         (double-float (make-form (lookup "Double") form)))
