@@ -27,7 +27,7 @@
                        (instantiate-type type vargen)
                      (values (make-form local-type (form-code form))
                              constraints)))
-                  (t form))))
+                  (t (make-form type form)))))
         (integer (make-form (lookup "Word") form))
         (single-float (make-form (lookup "Float") form))
         (double-float (make-form (lookup "Double") form)))

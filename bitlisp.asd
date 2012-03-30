@@ -4,6 +4,7 @@
   :pathname "src/"
   :components
   ((:file "package")
+   (:file "utils")
    (:file "symbols")
    (:file "reader")
    (:file "environments")
@@ -11,4 +12,5 @@
    (:file "values")
    (:file "unification")
    (:file "typechecking")
+   (:file "codegen")
    (:file "primitives")))

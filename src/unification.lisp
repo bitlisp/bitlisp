@@ -44,13 +44,11 @@
                        rest)))))))
 
 (defun unif-apply (unifier form)
-  (if (consp form)
-      (destructuring-bind (type . code) form
-        (make-form (subst-apply unifier type)
-                   (if (listp code)
-                       (destructuring-bind (operator &rest args) code
-                         (typecase operator
-                           (special-op (apply (special-op-subst operator) unifier args))
-                           (t (mapcar (curry #'unif-apply unifier) code))))
-                       code)))
-      form))
+  (destructuring-bind (type . code) form
+    (if (listp code)
+        (destructuring-bind (op &rest args) code
+          (etypecase op
+            (special-op (apply (special-op-subst op) unifier type args))
+            (form (make-form (subst-apply unifier type)
+                             (mapcar (curry #'unif-apply unifier) code)))))
+        (make-form (subst-apply unifier type) code))))

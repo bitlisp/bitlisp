@@ -100,6 +100,12 @@
                  :constructor :ptr
                  :args (list target-type)))
 
+(defmethod llvm ((type constructed-type))
+  ;; TODO: Invoke an implementation stored in the constructor.
+  (ecase (constructor type)
+    (:func (llvm:function-type (llvm (first (args type))) (mapcar #'llvm (rest (args type)))))
+    (:ptr (llvm:pointer-type (llvm (first (args type)))))))
+
 (defclass universal-type (bl-type)
   ((variables :initarg :variables :reader variables)
    (constraints :initarg :constraints :initform nil :reader constraints)
