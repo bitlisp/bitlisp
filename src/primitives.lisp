@@ -47,7 +47,7 @@
                  (list* self name args (mapcar (curry 'unif-apply unifier) body))))
     (module builder type
       (declare (ignore builder))
-      (prog1-let* ((func (llvm:add-function module "lambda" (llvm type)))
+      (prog1-let* ((func (llvm:add-function module (name (name name)) (llvm type)))
                    (entry (llvm:append-basic-block func "entry")))
         (setf (llvm name) func)
         (mapc (lambda (param var) (setf (llvm var) param))
