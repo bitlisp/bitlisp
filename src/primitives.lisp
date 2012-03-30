@@ -163,15 +163,15 @@
 
 (defprimfun "word+" "Word" ((lhs "Word") (rhs "Word"))
     (module builder type)
-  (llvm:build-ret builder (llvm:build-add builder lhs rhs "result")))
+  (llvm:build-ret builder (llvm:build-add builder lhs rhs "sum")))
 
 (defprimfun "word-" "Word" ((lhs "Word") (rhs "Word"))
     (module builder type)
-  (llvm:build-ret builder (llvm:build-sub builder lhs rhs "result")))
+  (llvm:build-ret builder (llvm:build-sub builder lhs rhs "difference")))
 
 (defprimfun "word>" "Bool" ((lhs "Word") (rhs "Word"))
     (module builder type)
-  (llvm:build-ret builder (llvm:build-i-cmp builder := lhs rhs "result")))
+  (llvm:build-ret builder (llvm:build-i-cmp builder :> lhs rhs "greater")))
 
 ;; (defprimfun "load" (make-instance 'universal-type
 ;;                                   :variables '(0)
