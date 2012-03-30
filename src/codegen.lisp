@@ -3,7 +3,7 @@
 (defun compile-full (forms &optional (outpath "./bitlisp.s"))
   (with-tmp-file bc
     (compile-module forms bc)
-    (ccl:run-program "opt" (list "-std-compile-opts" "-o" bc bc))
+    (ccl:run-program "opt" (list "-O3" "-o" bc bc))
     (ccl:run-program "llc" (list "-O3" "-o" outpath bc))))
 
 (defun compile-module (forms &optional (outpath "./bitlisp.bc"))
