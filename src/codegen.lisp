@@ -1,12 +1,18 @@
 (in-package #:bitlisp)
 
-(defun compile-module (forms)
+(defun compile-full (forms &optional (outpath "./bitlisp.s"))
+  (with-tmp-file bc
+    (compile-module forms bc)
+    (ccl:run-program "opt" (list "-std-compile-opts" "-o" bc bc))
+    (ccl:run-program "llc" (list "-O3" "-o" outpath bc))))
+
+(defun compile-module (forms &optional (outpath "./bitlisp.bc"))
   (llvm:with-module (module "bitlisp")
     ;; TODO: Compile these once per compiler instance, or even load them from LLVM IR.
     (build-primfuns module)
     ;; nil builder indicates top level
     (mapc (curry 'codegen module nil) forms)
-    (llvm:dump-module module)))
+    (llvm:write-bitcode-to-file module outpath)))
 
 (defun codegen (module builder form)
   (destructuring-bind (type . code) form
