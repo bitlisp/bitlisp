@@ -3,7 +3,7 @@
 (define-parser *parser*
   (:start-symbol sexp)
   (:terminals (lparen rparen symbol integer single-float double-float string quote))
-  
+
   (sexp
    (lparen sexps rparen (lambda (a b c) (declare (ignore a c)) (nreverse b)))
    atom)
@@ -74,7 +74,6 @@
                   (decf nesting)
                   (vector-push-extend char buffer)
                   (when (= 0 nesting)
-                    (unread-char char stream)
                     (return buffer)))
                  (t (vector-push-extend char buffer)))))
 
@@ -114,3 +113,9 @@
 (defun bl-read (&optional (stream *standard-input*))
   (with-input-from-string (s (buffer-sexp stream))
    (parse-with-lexer (curry #'lexer s) *parser*)))
+
+(defun bl-read-file (file)
+  (with-open-file (stream file)
+    (loop :for form := (handler-case (bl-read stream)
+                         (end-of-file () nil))
+          :while form :collect form)))
