@@ -15,7 +15,7 @@
 (defun generalize-type (incomplete-type)
   (if-let (vars (free-vars incomplete-type))
     (make-instance 'universal-type
-                   :variables (free-vars incomplete-type)
+                   :variables vars
                    :inner-type incomplete-type)
     incomplete-type))
 

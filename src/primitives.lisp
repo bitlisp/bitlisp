@@ -183,7 +183,7 @@
          (bindings (env import))))))
 
 (defspecial "the" self (type value)
-    (env (list self (type-eval env type) (resolve env value)))
+    (env (list self (type-eval type env) (resolve env value)))
     (vargen
       (multiple-value-bind (value-form constraints) (constrain vargen value)
         (values value-form
@@ -192,9 +192,9 @@
 
 (defspecial "cdef" self (name return-type &rest args)
     (env
-      (let* ((rtype (type-eval env return-type))
+      (let* ((rtype (type-eval return-type env))
              (typed-args (mapcar (lambda (arg)
-                                   (list (first arg) (type-eval env (second arg))))
+                                   (list (first arg) (type-eval (second arg) env)))
                                  args))
              (var (make-instance 'var
                                  :name name
