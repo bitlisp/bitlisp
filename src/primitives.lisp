@@ -69,7 +69,7 @@
       (declare (ignore builder))
       (prog1-let* ((func (llvm:add-function module (var-fqn name) (llvm type)))
                    (entry (llvm:append-basic-block func "entry")))
-        (setf (llvm:linkage func) :private
+        (setf (llvm:linkage func) :internal
               (llvm:function-calling-convention func) :fast
               (llvm name) func)
         (mapc (lambda (param var) (setf (llvm var) param
