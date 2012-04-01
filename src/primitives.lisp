@@ -164,19 +164,6 @@
                      (llvm var) val))))
          (bindings (env import))))))
 
-(defmacro def-bl-type (name class &rest initargs)
-  `(bind (env *core-module*) (make-bl-symbol ,name) (make-instance ',class ,@initargs)))
-
-(def-bl-type "Unit" unit-type)
-(def-bl-type "Float"  simple-type :llvm (llvm:float-type))
-(def-bl-type "Double" simple-type :llvm (llvm:double-type))
-;;; TODO: 64-bit support
-(def-bl-type "Word"  machine-int :bits 32 :signed t)
-(def-bl-type "UWord" machine-int :bits 32 :signed nil)
-(def-bl-type "Byte"  machine-int :bits 8  :signed t)
-(def-bl-type "UByte" machine-int :bits 8  :signed nil)
-(def-bl-type "Bool"  machine-int :bits 1  :signed nil)
-
 (defmacro defctor (name (&rest args) &body builder)
   (with-gensyms (sym)
    `(let ((,sym (make-bl-symbol ,name)))
@@ -185,10 +172,19 @@
                            :name ,sym
                            :llvm (lambda ,args ,@builder))))))
 
+(defctor "Int" (bits)
+  (check-type bits integer)
+  (llvm:int-type bits))
+(defctor "UInt" (bits)
+  (check-type bits integer)
+  (llvm:int-type bits))
 (defctor "Func" (return-type &rest arg-types)
   (llvm:function-type (llvm return-type) (mapcar #'llvm arg-types)))
 (defctor "Ptr" (inner-type)
   (llvm:pointer-type (llvm inner-type)))
+(defctor "Vector" (inner-type count)
+  (check-type count integer)
+  (llvm:vector-type (llvm inner-type) count))
 
 (defun make-ftype (return-type &rest arg-types)
   (make-instance 'constructed-type
@@ -203,6 +199,25 @@
   (make-instance 'constructed-type
                  :constructor (lookup "Ptr")
                  :args (list target-type)))
+
+(defmacro def-bl-type (name class &rest initargs)
+  `(bind (env *core-module*) (make-bl-symbol ,name) (make-instance ',class ,@initargs)))
+
+(def-bl-type "Unit" unit-type)
+(def-bl-type "Float"  simple-type :llvm (llvm:float-type))
+(def-bl-type "Double" simple-type :llvm (llvm:double-type))
+(def-bl-type "Bool"   simple-type :llvm (llvm:int1-type))
+(macrolet ((defint (name width signed)
+             `(progn (def-bl-type ,name constructed-type
+                       :constructor ,(if signed
+                                         '(lookup "Int")
+                                         '(lookup "UInt"))
+                       :args '(,width)))))
+;;; TODO: Architecture portability
+  (defint "Word"  32 t)
+  (defint "UWord" 32 nil)
+  (defint "Byte"  8  t)
+  (defint "UByte" 8  nil))
 
 (defparameter *primfun-builders* nil)
 
