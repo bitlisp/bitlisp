@@ -7,7 +7,10 @@
    (module :initarg :module :accessor module)
    (toplevel? :initarg :toplevel? :accessor toplevel?)))
 
-(defun lookup (symbol &optional (env (env *core-module*)))
+(defvar *primitives-env* (make-instance 'environment :toplevel? t)
+  "Environment in which all primitive operators are bound")
+
+(defun lookup (symbol &optional (env *primitives-env*))
   (when (stringp symbol)
     (setf symbol (make-bl-symbol symbol)))
   (if env

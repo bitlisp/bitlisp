@@ -1,6 +1,6 @@
 (in-package #:bitlisp)
 
-(defmacro defspecial (tgt-module name self (&rest args)
+(defmacro defspecial (name self (&rest args)
                       (env &body resolver)
                       &optional
                         ((vargen &body constrainer) nil crsupplied?)
@@ -25,9 +25,9 @@
                                             `(lambda (,module ,builder ,ctype ,@args)
                                                ,@codegen)
                                             errlambda))
-      (bind (env ,tgt-module) (make-bl-symbol ,name) ,self))))
+      (bind *primitives-env* (make-bl-symbol ,name) ,self))))
 
-(defspecial *core-module* "nlambda" self (name args &rest body)
+(defspecial "nlambda" self (name args &rest body)
     (env
       (let* ((new-env (make-instance 'environment
                                      :parents (list env)
@@ -78,7 +78,7 @@
                 :for genned := (codegen module local-builder form)
                 :unless rest :do (llvm:build-ret local-builder genned))))))
 
-(defspecial *core-module* "if" self (condition then else)
+(defspecial "if" self (condition then else)
     (env
       (list self (resolve env condition)
             (resolve env then) (resolve env else)))
@@ -121,7 +121,7 @@
                              (list then-result else-result)
                              (list then-block  else-block))))))
 
-(defspecial *core-module* "def" self (name value)
+(defspecial "def" self (name value)
     (env
       (let ((var (make-instance 'var :name name :env env)))
         (bind env name var)
@@ -145,7 +145,7 @@
        (setf (llvm:value-name llvm-value) (var-fqn name)
              (llvm name) llvm-value))))
 
-(defspecial *root-module* "module" self (name imports &rest exports)
+(defspecial "module" self (name imports &rest exports)
     (env
       (assert (toplevel? env) () "Cannot change modules below the top level")
       (let ((import-modules (mapcar (rcurry #'lookup env) imports)))
@@ -173,13 +173,13 @@
                                                (symbol-fqn import binding-name)
                                                (llvm (var-type var)))
                             (llvm:add-global lmodule
-                                             (var-type var)
+                                             (llvm (var-type var))
                                              (symbol-fqn import binding-name)))))
                (setf (llvm:linkage val) :external
                      (llvm var) val))))
          (bindings (env import))))))
 
-(defspecial *core-module* "the" self (type value)
+(defspecial "the" self (type value)
     (env (list self (type-eval env type) (resolve env value)))
     (vargen
       (multiple-value-bind (value-form constraints) (constrain vargen value)
@@ -190,7 +190,7 @@
 (defmacro defctor (name (&rest args) &body builder)
   (with-gensyms (sym)
    `(let ((,sym (make-bl-symbol ,name)))
-      (bind (env *core-module*) ,sym
+      (bind *primitives-env* ,sym
             (make-instance 'type-constructor
                            :name ,sym
                            :llvm (lambda ,args ,@builder))))))
@@ -236,7 +236,7 @@
 (defmacro defsimpletype (name llvm)
   (with-gensyms (sym)
     `(let ((,sym (make-bl-symbol ,name)))
-       (bind (env *core-module*) ,sym
+       (bind *primitives-env* ,sym
              (make-instance 'simple-type
                             :name ,sym
                             :llvm ,llvm)))))
@@ -248,7 +248,7 @@
 (defmacro defint (name width signed)
   (with-gensyms (sym)
     `(let ((,sym (make-bl-symbol ,name)))
-       (bind (env *core-module*) ,sym
+       (bind *primitives-env* ,sym
              (make-instance 'constructed-type
                             :constructor ,(if signed
                                               '(lookup "Int")
@@ -262,20 +262,23 @@
 
 (defparameter *primfun-builders* nil)
 
-(defun build-primfuns (module)
+(defun build-primfuns (bl-module llvm-module)
   (mapc (lambda (pair)
-          (setf (llvm (car pair)) (funcall (cdr pair) module)))
+          (setf (llvm (car pair)) (funcall (cdr pair) bl-module llvm-module)))
         *primfun-builders*))
 
 (defmacro defprimfun (name rtype args (module builder type) &body llvm)
-  (with-gensyms (symbol func entry var)
+  (with-gensyms (symbol func entry var bl-module)
    `(let* ((,symbol (make-bl-symbol ,name))
            (,type (make-ftype (lookup ,rtype) ,@(mapcar (compose (curry #'list 'lookup) #'second) args)))
            (,var (make-instance 'var
                                 :name ,symbol
                                 :var-type ,type)))
-      (push (cons ,var (lambda (,module)
-                         (prog1-let* ((,func (llvm:add-function module ,(symbol-fqn *core-module* (make-bl-symbol name)) (llvm ,type)))
+      (push (cons ,var (lambda (,bl-module ,module)
+                         (prog1-let* ((,func (llvm:add-function module
+                                                                (symbol-fqn ,bl-module
+                                                                            (make-bl-symbol ,name))
+                                                                (llvm ,type)))
                                       (,entry (llvm:append-basic-block ,func "entry")))
                            (mapc #'(setf llvm:value-name)
                                  ',(mapcar (compose #'string-downcase #'first) args)
@@ -286,7 +289,7 @@
                                  (llvm:params ,func)
                                ,@llvm)))))
             *primfun-builders*)
-      (bind (env *core-module*) ,symbol ,var))))
+      (bind *primitives-env* ,symbol ,var))))
 
 (defprimfun "word+" "Word" ((lhs "Word") (rhs "Word"))
     (module builder type)

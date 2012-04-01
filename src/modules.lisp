@@ -5,10 +5,10 @@
    (env :initarg :env :reader env)
    (parent :initarg :parent :reader parent)
    (imports :initarg :imports :reader imports)
-   (exports :initarg :exports :accessor exports)))
+   (exports :initarg :exports :reader exports)))
 
 (defun module-fqn (module)
-  (if (eq module *root-module*)
+  (if (null (name module))              ;Identifies root module
       ""
       (concatenate 'string (module-fqn (parent module))
                    ":" (name (name module)))))
@@ -29,13 +29,14 @@
         (princ "root" stream)
         (princ (module-fqn module) stream))))
 
-(defun make-module (name parent imports exports)
-  (let ((menv (make-instance 'environment
-                             :toplevel? t
-                             :parents (if parent
-                                          (cons (env parent)
-                                                (mapcar #'env imports))
-                                          (mapcar #'env imports)))))
+(defun make-module (name parent imports exports &optional env)
+  (let ((menv (or env
+                  (make-instance 'environment
+                                 :toplevel? t
+                                 :parents (if parent
+                                              (cons (env parent)
+                                                    (mapcar #'env imports))
+                                              (mapcar #'env imports))))))
     (prog1-let (mod (make-instance
                      'module
                      :name name
@@ -44,9 +45,13 @@
                      :imports imports
                      :exports exports))
       (setf (module menv) mod)
-      (when parent
-        (bind (env parent) name mod)))))
+      (bind (env parent) name mod))))
 
-(defvar *root-module* (make-module nil nil nil nil))
-(defvar *core-module* (make-module (make-bl-symbol "core") *root-module* nil nil))
-(defvar *scratch-module* (make-module (make-bl-symbol "scratch") *root-module* (list *core-module*) nil))
+(defun make-root ()
+  (let ((root-env (make-instance 'environment :toplevel? t)))
+   (prog1-let (root (make-instance 'module
+                                   :name nil
+                                   :env root-env))
+     (setf (module root-env) root)
+     (make-module (make-bl-symbol "core") root nil nil *primitives-env*)
+     (bind (env root) (make-bl-symbol "module") (lookup "module" *primitives-env*)))))
