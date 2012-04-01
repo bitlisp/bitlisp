@@ -21,6 +21,14 @@
                 (setf thing value)))
     thing))
 
+(defun type-eval (env code)
+  (etypecase code
+    (bl-symbol (lookup code env))
+    (list (destructuring-bind (constructor &rest args) code
+            (make-instance 'constructed-type
+                           :constructor (lookup constructor env)
+                           :args (mapcar (curry #'type-eval env) args))))))
+
 (defun subst-constraints (substitutions constraints)
   (mapcar (lambda (constraint)
             (destructuring-bind (l . r) constraint
