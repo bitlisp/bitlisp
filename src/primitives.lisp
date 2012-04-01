@@ -69,6 +69,7 @@
       (declare (ignore builder))
       (prog1-let* ((func (llvm:add-function module (var-fqn name) (llvm type)))
                    (entry (llvm:append-basic-block func "entry")))
+        (setf (llvm:linkage func) :private)
         (setf (llvm name) func)
         (mapc (lambda (param var) (setf (llvm var) param))
               (llvm:params func) args)
@@ -139,10 +140,11 @@
         (make-form final-type
                    (list self name (make-form final-type (form-code value-form))))))
     (module builder type
-      ;; TODO: Nontrivial values
+      ;; TODO: Non-function values
       (declare (ignore type))
       (let ((llvm-value (codegen module builder value)))
        (setf (llvm:value-name llvm-value) (var-fqn name)
+             (llvm:linkage llvm-value :external)
              (llvm name) llvm-value))))
 
 (defspecial "module" self (name imports &rest exports)
