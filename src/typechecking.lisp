@@ -30,6 +30,7 @@
                      (values (make-form local-type (form-code form))
                              constraints)))
                   (t (make-form type form)))))
+        (string (make-form (type-eval '("Ptr" "Byte")) form))
         (integer (make-form (lookup "Word") form))
         (single-float (make-form (lookup "Float") form))
         (double-float (make-form (lookup "Double") form)))

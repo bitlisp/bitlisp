@@ -50,4 +50,4 @@
 	   ;(macro (error "TODO: Macroexpansion"))
 	   (special-op (apply (special-op-resolver op) env args))
 	   (t (cons op (mapcar (curry #'resolve env) args)))))))
-    ((or integer single-float double-float) form)))
+    ((or string integer single-float double-float) form)))
