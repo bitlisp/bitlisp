@@ -69,8 +69,8 @@
       (declare (ignore builder))
       (prog1-let* ((func (llvm:add-function module (var-fqn name) (llvm type)))
                    (entry (llvm:append-basic-block func "entry")))
-        (setf (llvm:linkage func) :private)
-        (setf (llvm name) func)
+        (setf (llvm:linkage func) :private
+              (llvm name) func)
         (mapc (lambda (param var) (setf (llvm var) param))
               (llvm:params func) args)
         (llvm:with-object (local-builder builder)
@@ -143,9 +143,9 @@
       ;; TODO: Non-function values
       (declare (ignore type))
       (let ((llvm-value (codegen module builder value)))
-       (setf (llvm:value-name llvm-value) (var-fqn name)
-             (llvm:linkage llvm-value :external)
-             (llvm name) llvm-value))))
+        (setf (llvm:value-name llvm-value) (var-fqn name)
+              (llvm:linkage llvm-value) :external
+              (llvm name) llvm-value))))
 
 (defspecial "module" self (name imports &rest exports)
     (env
