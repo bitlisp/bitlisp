@@ -3,8 +3,9 @@
 (defun compile-full (sexps &optional (outpath "./bitlisp.s"))
   (let ((root-module (make-root)))
     (with-tmp-file (bc "bitlisp-")
-      (compile-unit sexps :base-module root-module
-                          :outpath bc)
+      (compile-unit sexps root-module
+                    :outpath bc
+                    :main-unit? t)
       (with-tmp-file (core "bitlisp-core-")
         (llvm:with-object (core-module module ":core")
           (build-primfuns (lookup "core" (env root-module)) core-module)
@@ -16,21 +17,44 @@
       (ccl:run-program "llc" (list "-O3" "-o" outpath bc)
                        :output *standard-output* :error *error-output*))))
 
-(defun compile-unit (sexps &key base-module (outpath "./bitlisp.bc"))
-  (multiple-value-bind (module-form next-module) (build-types base-module (first sexps))
+(defun compile-unit (sexps base-module &key (outpath "./bitlisp.bc") main-unit?)
+  (multiple-value-bind (module-form unit-module) (build-types base-module (first sexps))
     (assert (and (listp (form-code module-form))
                  (eq (first (form-code module-form)) (lookup "module")))
             ()
             "Compilation units must begin with a module declaration! (got ~A)"
             module-form)
-    (llvm:with-object (llvm-module module (module-fqn next-module))
+    (llvm:with-object (llvm-module module (module-fqn unit-module))
       (codegen llvm-module nil module-form)
       ;; nil IR builder argument here indicates toplevel
       ;; TODO: Toplevel forms should be permissible and execute at startup
       (mapc (compose (curry #'codegen llvm-module nil)
-                     (curry #'build-types next-module))
+                     (curry #'build-types unit-module))
             (rest sexps))
+      (when main-unit?
+        (multiple-value-bind (var exists?)
+            (lookup "main" (env unit-module))
+          (assert exists? () "No main bound in ~A" base-module)
+          (compile-main llvm-module var)))
       (llvm:write-bitcode-to-file llvm-module outpath))))
+
+(defun compile-main (llvm-module internal-main)
+  (let ((ftype (type-eval '("Func" "Word" "Word" ("Ptr" ("Ptr" "Byte"))))))
+   (assert (bl-type= (var-type internal-main) ftype)
+           ()
+           "main is of inappropriate type ~A (should be ~A)"
+           (var-type internal-main) ftype)
+    (llvm:with-objects ((builder builder))
+      (let* ((main (llvm:add-function llvm-module "main" (llvm ftype)))
+             (entry (llvm:append-basic-block main "entry"))
+             (params (llvm:params main)))
+        (setf (llvm:value-name (first params)) "argc"
+              (llvm:value-name (second params)) "argv")
+        (llvm:position-builder-at-end builder entry)
+        (let ((call (llvm:build-call builder (llvm internal-main) (llvm:params main)
+                                     "result")))
+          (setf (llvm:instruction-calling-convention call) :fast)
+          (llvm:build-ret builder call))))))
 
 (defun codegen (llvm-module builder form)
   (destructuring-bind (type . code) form
