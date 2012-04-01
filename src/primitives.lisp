@@ -53,7 +53,7 @@
                   (push new-form forms)
                   (push new-constraints constraints))
             :finally (let ((ftype (apply #'make-ftype
-                                         (form-type (car (last forms)))
+                                         (form-type (first forms))
                                          (mapcar #'var-type args))))
                        (return
                          (values
