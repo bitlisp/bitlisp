@@ -23,10 +23,11 @@
 
 (defun type-eval (env code)
   (etypecase code
+    (integer code)
     (bl-symbol (lookup code env))
     (list (destructuring-bind (constructor &rest args) code
             (make-instance 'constructed-type
-                           :constructor (lookup constructor env)
+                           :constructor (type-eval env constructor)
                            :args (mapcar (curry #'type-eval env) args))))))
 
 (defun subst-constraints (substitutions constraints)
@@ -63,16 +64,13 @@
 
 (defclass bl-type () ())
 
-(defclass unit-type (bl-type) ())
-
-(defmethod print-object ((type unit-type) stream)
-  (print-unreadable-object (type stream :type t)))
-
-(defmethod bl-type= ((a unit-type) (b unit-type))
-  t)
-
 (defclass simple-type (bl-type)
-  ((llvm :initarg :llvm :reader llvm)))
+  ((name :initarg :name :reader name)
+   (llvm :initarg :llvm :reader llvm)))
+
+(defmethod print-object ((type simple-type) stream)
+  (print-unreadable-object (type stream)
+    (princ (name type) stream)))
 
 (defclass machine-int (bl-type)
   ((bits :initarg :bits :reader bits)

@@ -1,16 +1,31 @@
 (in-package #:bitlisp)
 
-(defmacro defspecial (tgt-module name self args
+(defmacro defspecial (tgt-module name self (&rest args)
                       (env &body resolver)
-                      (vargen &body constrainer)
-                      (unifier utype &body subst)
-                      (module builder ctype &body codegen))
-  `(let ((,self (make-special-op :name ,name)))
-     (setf (special-op-resolver ,self) (lambda (,env ,@args) ,@resolver)
-           (special-op-constrainer ,self) (lambda (,vargen ,@args) ,@constrainer)
-           (special-op-subst ,self) (lambda (,unifier ,utype ,@args) ,@subst)
-           (special-op-codegen ,self) (lambda (,module ,builder ,ctype ,@args) ,@codegen))
-     (bind (env ,tgt-module) (make-bl-symbol ,name) ,self)))
+                      &optional
+                        ((vargen &body constrainer) nil crsupplied?)
+                        ((unifier utype &body subst) '(nil nil) ufsupplied?)
+                        ((module builder ctype &body codegen) '(nil nil nil) cgsupplied?))
+  (let ((errlambda `(lambda (&rest args)
+                      (declare (ignore args))
+                      (error ,(concatenate 'string
+                                           "Internal error: Special op " name
+                                           " present at invalid stage!")))))
+   `(let ((,self (make-special-op :name ,name)))
+      (setf (special-op-resolver ,self) (lambda (,env ,@args) ,@resolver)
+            (special-op-constrainer ,self) ,(if crsupplied?
+                                                `(lambda (,vargen ,@args)
+                                                   ,@constrainer)
+                                                errlambda)
+            (special-op-subst ,self) ,(if ufsupplied?
+                                          `(lambda (,unifier ,utype ,@args)
+                                             ,@subst)
+                                          errlambda)
+            (special-op-codegen ,self) ,(if cgsupplied?
+                                            `(lambda (,module ,builder ,ctype ,@args)
+                                               ,@codegen)
+                                            errlambda))
+      (bind (env ,tgt-module) (make-bl-symbol ,name) ,self))))
 
 (defspecial *core-module* "nlambda" self (name args &rest body)
     (env
@@ -164,6 +179,14 @@
                      (llvm var) val))))
          (bindings (env import))))))
 
+(defspecial *core-module* "the" self (type value)
+    (env (list self (type-eval env type) (resolve env value)))
+    (vargen
+      (multiple-value-bind (value-form constraints) (constrain vargen value)
+        (values value-form
+                (cons (cons type (form-type value-form))
+                      constraints)))))
+
 (defmacro defctor (name (&rest args) &body builder)
   (with-gensyms (sym)
    `(let ((,sym (make-bl-symbol ,name)))
@@ -210,24 +233,32 @@
                  :constructor (lookup "Ptr")
                  :args (list target-type)))
 
-(defmacro def-bl-type (name class &rest initargs)
-  `(bind (env *core-module*) (make-bl-symbol ,name) (make-instance ',class ,@initargs)))
+(defmacro defsimpletype (name llvm)
+  (with-gensyms (sym)
+    `(let ((,sym (make-bl-symbol ,name)))
+       (bind (env *core-module*) ,sym
+             (make-instance 'simple-type
+                            :name ,sym
+                            :llvm ,llvm)))))
+(defsimpletype "Unit"   (llvm:void-type))
+(defsimpletype "Float"  (llvm:float-type))
+(defsimpletype "Double" (llvm:double-type))
+(defsimpletype "Bool"   (llvm:int1-type))
 
-(def-bl-type "Unit" unit-type)
-(def-bl-type "Float"  simple-type :llvm (llvm:float-type))
-(def-bl-type "Double" simple-type :llvm (llvm:double-type))
-(def-bl-type "Bool"   simple-type :llvm (llvm:int1-type))
-(macrolet ((defint (name width signed)
-             `(progn (def-bl-type ,name constructed-type
-                       :constructor ,(if signed
-                                         '(lookup "Int")
-                                         '(lookup "UInt"))
-                       :args '(,width)))))
+(defmacro defint (name width signed)
+  (with-gensyms (sym)
+    `(let ((,sym (make-bl-symbol ,name)))
+       (bind (env *core-module*) ,sym
+             (make-instance 'constructed-type
+                            :constructor ,(if signed
+                                              '(lookup "Int")
+                                              '(lookup "UInt"))
+                            :args '(,width))))))
 ;;; TODO: Architecture portability
-  (defint "Word"  32 t)
-  (defint "UWord" 32 nil)
-  (defint "Byte"  8  t)
-  (defint "UByte" 8  nil))
+(defint "Word"  32 t)
+(defint "UWord" 32 nil)
+(defint "Byte"  8  t)
+(defint "UByte" 8  nil)
 
 (defparameter *primfun-builders* nil)
 
