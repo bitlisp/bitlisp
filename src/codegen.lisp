@@ -32,11 +32,6 @@
   (mapc (curry 'codegen llvm-module nil) forms)
   (llvm:write-bitcode-to-file llvm-module outpath))
 
-(defun compile-core ()
-  (llvm:with-object (lmodule module (module-fqn *core-module*))
-    (build-primfuns lmodule)
-    (llvm:write-bitcode-to-file lmodule "core.bc")))
-
 (defun codegen (llvm-module builder form)
   (destructuring-bind (type . code) form
     (etypecase code
@@ -48,8 +43,9 @@
          (etypecase op
            (special-op (apply (special-op-codegen op)
                               llvm-module builder type args))
-           (form (llvm:build-call builder (codegen llvm-module builder op)
-                                  (map 'vector
-                                       (curry #'codegen llvm-module builder)
-                                       args)
-                                  "result"))))))))
+           (form (prog1-let (call (llvm:build-call builder (codegen llvm-module builder op)
+                                                   (map 'vector
+                                                        (curry #'codegen llvm-module builder)
+                                                        args)
+                                                   "result"))
+                   (setf (llvm:instruction-calling-convention call) :fast)))))))))

@@ -70,8 +70,10 @@
       (prog1-let* ((func (llvm:add-function module (var-fqn name) (llvm type)))
                    (entry (llvm:append-basic-block func "entry")))
         (setf (llvm:linkage func) :private
+              (llvm:function-calling-convention func) :fast
               (llvm name) func)
-        (mapc (lambda (param var) (setf (llvm var) param))
+        (mapc (lambda (param var) (setf (llvm var) param
+                                        (llvm:value-name param) (name (name var))))
               (llvm:params func) args)
         (llvm:with-object (local-builder builder)
           (llvm:position-builder-at-end local-builder entry)
@@ -169,9 +171,10 @@
          (lambda (binding-name var)
            (when (typep var 'var)
              (let ((val (if (ftype? (var-type var))
-                            (llvm:add-function lmodule
-                                               (symbol-fqn import binding-name)
-                                               (llvm (var-type var)))
+                            (prog1-let (func (llvm:add-function lmodule
+                                                                (symbol-fqn import binding-name)
+                                                                (llvm (var-type var))))
+                              (setf (llvm:function-calling-convention func) :fast))
                             (llvm:add-global lmodule
                                              (llvm (var-type var))
                                              (symbol-fqn import binding-name)))))
@@ -280,6 +283,7 @@
                                                                             (make-bl-symbol ,name))
                                                                 (llvm ,type)))
                                       (,entry (llvm:append-basic-block ,func "entry")))
+                           (setf (llvm:function-calling-convention ,func) :fast)
                            (mapc #'(setf llvm:value-name)
                                  ',(mapcar (compose #'string-downcase #'first) args)
                                  (llvm:params ,func))
