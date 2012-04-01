@@ -25,9 +25,7 @@
 
 (defmethod print-object ((module module) stream)
   (print-unreadable-object (module stream :type t)
-    (if (eq module *root-module*)
-        (princ "root" stream)
-        (princ (module-fqn module) stream))))
+    (princ (module-fqn module) stream)))
 
 (defun make-module (name parent imports exports &optional env)
   (let ((menv (or env
