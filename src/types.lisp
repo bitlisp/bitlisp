@@ -23,7 +23,7 @@
           constraints))
 
 (defun constraint= (a b)
-  "Check that two equality constraints are equal."
+  "Check that two equality constraints are interchangable."
   (check-type a cons)
   (check-type b cons)
   (or (and (bl-type= (car a) (car b))
@@ -65,6 +65,14 @@
   (and (= (bits a) (bits b))
        (eq (signed a) (signed b))))
 
+(defclass type-constructor ()
+  ((name :initarg :name :reader name)
+   (llvm :initarg :llvm :reader llvm)))
+
+(defmethod print-object ((ctor type-constructor) stream)
+  (print-unreadable-object (ctor stream :type t)
+    (princ (name ctor) stream)))
+
 (defclass constructed-type (bl-type)
   ((constructor :initarg :constructor :reader constructor)
    (args :initarg :args :reader args)))
@@ -76,40 +84,20 @@
                   :key 'free-vars))))
 
 (defmethod bl-type= ((a constructed-type) (b constructed-type))
-  (and (bl-type= (constructor a) (constructor b))
+  (and (eq (constructor a) (constructor b))
        (every #'bl-type= (args a) (args b))))
 
 (defmethod print-object ((type constructed-type) stream)
   (print-unreadable-object (type stream)
-    (format stream "~A~{ ~A~}" (constructor type) (args type))))
+    (format stream "~A~{ ~A~}" (name (constructor type)) (args type))))
 
 (defmethod subst-apply (substitution (type constructed-type))
   (make-instance 'constructed-type
                  :constructor (subst-apply substitution (constructor type))
                  :args (mapcar (curry 'subst-apply substitution) (args type))))
 
-(defun make-ftype (return-type &rest arg-types)
-  (make-instance 'constructed-type
-                 ;; TODO: Real constructor
-                 :constructor :func
-                 :args (list* return-type arg-types)))
-
-(defun ftype? (type)
-  (and (typep type 'constructed-type)
-       ;; TODO: etc
-       (eq :func (constructor type))))
-
-(defun make-ptr (target-type)
-  (make-instance 'constructed-type
-                 ;; TODO: Real constructor
-                 :constructor :ptr
-                 :args (list target-type)))
-
 (defmethod llvm ((type constructed-type))
-  ;; TODO: Invoke an implementation stored in the constructor.
-  (ecase (constructor type)
-    (:func (llvm:function-type (llvm (first (args type))) (mapcar #'llvm (rest (args type)))))
-    (:ptr (llvm:pointer-type (llvm (first (args type)))))))
+  (apply (llvm (constructor type)) (args type)))
 
 (defclass universal-type (bl-type)
   ((variables :initarg :variables :reader variables)

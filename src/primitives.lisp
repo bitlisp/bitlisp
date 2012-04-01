@@ -177,6 +177,33 @@
 (def-bl-type "UByte" machine-int :bits 8  :signed nil)
 (def-bl-type "Bool"  machine-int :bits 1  :signed nil)
 
+(defmacro defctor (name (&rest args) &body builder)
+  (with-gensyms (sym)
+   `(let ((,sym (make-bl-symbol ,name)))
+      (bind (env *core-module*) ,sym
+            (make-instance 'type-constructor
+                           :name ,sym
+                           :llvm (lambda ,args ,@builder))))))
+
+(defctor "Func" (return-type &rest arg-types)
+  (llvm:function-type (llvm return-type) (mapcar #'llvm arg-types)))
+(defctor "Ptr" (inner-type)
+  (llvm:pointer-type (llvm inner-type)))
+
+(defun make-ftype (return-type &rest arg-types)
+  (make-instance 'constructed-type
+                 :constructor (lookup "Func")
+                 :args (list* return-type arg-types)))
+
+(defun ftype? (type)
+  (and (typep type 'constructed-type)
+       (eq (lookup "Func") (constructor type))))
+
+(defun make-ptr (target-type)
+  (make-instance 'constructed-type
+                 :constructor (lookup "Ptr")
+                 :args (list target-type)))
+
 (defparameter *primfun-builders* nil)
 
 (defun build-primfuns (module)
