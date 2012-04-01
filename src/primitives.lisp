@@ -163,7 +163,7 @@
       (make-form (lookup "Unit") (list* self name imports exports)))
     (unifier utype
       (declare (ignore unifier))
-      (make-form utype (print (list* self name imports exports))))
+      (make-form utype (list* self name imports exports)))
     (lmodule builder type
       (declare (ignore builder name exports type))
       (dolist (import imports)
@@ -189,6 +189,38 @@
         (values value-form
                 (cons (cons type (form-type value-form))
                       constraints)))))
+
+(defspecial "cdef" self (name return-type &rest args)
+    (env
+      (let* ((rtype (type-eval env return-type))
+             (typed-args (mapcar (lambda (arg)
+                                   (list (first arg) (type-eval env (second arg))))
+                                 args))
+             (var (make-instance 'var
+                                 :name name
+                                 :env env
+                                 :var-type (apply #'make-ftype rtype
+                                                  (mapcar #'second
+                                                          typed-args)))))
+        (bind env name var)
+        (list* self var rtype typed-args)))
+    (vargen
+     (declare (ignore vargen))
+     (make-form (lookup "Unit") (list* self name return-type args)))
+    (unifier utype
+             (declare (ignore unifier))
+             (make-form utype (list* self name return-type args)))
+    (module builder ctype
+            (declare (ignore builder ctype return-type args))
+            (let* ((cfunc (llvm:add-function module (name (name name)) (llvm (var-type name))))
+                   (blfunc (llvm:add-function module (var-fqn name) (llvm (var-type name))))
+                   (entry (llvm:append-basic-block blfunc "entry")))
+              (llvm:add-function-attributes blfunc :inline-hint)
+              (setf (llvm:function-calling-convention blfunc) :fast
+                    (llvm name) blfunc)
+              (llvm:with-object (builder builder)
+                (llvm:position-builder-at-end builder entry)
+                (llvm:build-ret builder (llvm:build-call builder cfunc (llvm:params blfunc) "result"))))))
 
 (defmacro defctor (name (&rest args) &body builder)
   (with-gensyms (sym)
