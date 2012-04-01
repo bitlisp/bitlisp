@@ -34,8 +34,18 @@
 (defun complete-type (type)
   (null (free-vars type)))
 
+(defclass type-var ()
+  ((number :initarg :number :reader number)))
+
+(defmethod bl-type= ((l type-var) (r type-var))
+  (= (number l) (number r)))
+
+(defmethod print-object ((type type-var) stream)
+  (print-unreadable-object (type stream)
+    (format stream "t~D" (number type))))
+
 (defun typevar? (x)
-  (integerp x))
+  (typep x 'type-var))
 
 (defclass bl-type () ())
 

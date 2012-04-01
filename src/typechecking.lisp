@@ -8,7 +8,9 @@
 
 (defun make-vargen ()
   (let ((x 0))
-    (lambda () (prog1 x (incf x)))))
+    (lambda ()
+      (prog1 (make-instance 'type-var :number x)
+        (incf x)))))
 
 (defun generalize-type (incomplete-type)
   (if-let (vars (free-vars incomplete-type))
