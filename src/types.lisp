@@ -1,15 +1,21 @@
 (in-package #:bitlisp)
 
 (defgeneric free-vars (type)
-  (:method ((type t))
+  (:method (type)
     (if (typevar? type)
         (list type)
         nil)))
 (defgeneric bl-type= (a b)
-  (:method ((a t) (b t))
-    (eql a b)))
+  (:method (a b)
+    "Base case to catch incompatible types"
+    (declare (ignore a b))
+    nil)
+  (:method ((a integer) (b integer))
+    "Integral types intended for use as primitive constructor parameters"
+    (= a b)))
 (defgeneric subst-apply (substitution thing)
-  (:method (s (thing t))
+  (:method (s thing)
+    "Default implementation for simple, flat substitutions"
     (loop :for (var . value) :in s
           :do (when (bl-type= var thing)
                 (setf thing value)))
@@ -82,6 +88,9 @@
 (defmethod print-object ((ctor type-constructor) stream)
   (print-unreadable-object (ctor stream :type t)
     (princ (name ctor) stream)))
+
+(defmethod bl-type= ((l type-constructor) (r type-constructor))
+  (eq l r))
 
 (defclass constructed-type (bl-type)
   ((constructor :initarg :constructor :reader constructor)
