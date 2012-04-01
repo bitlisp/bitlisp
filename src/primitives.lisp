@@ -154,8 +154,6 @@
         (let ((module (make-module name (module env)
                                    import-modules
                                    exports)))
-          (dolist (import import-modules)
-            (maphash (curry #'bind (env module)) (bindings (env import))))
           (values (list* self name import-modules exports)
                   module))))
     (vargen
