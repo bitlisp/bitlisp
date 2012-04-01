@@ -1,10 +1,10 @@
 (in-package #:bitlisp)
 
-(defun build-types (code)
-  (let ((resolved (resolve *core-env* code)))
+(defun build-types (module code)
+  (multiple-value-bind (resolved next-module) (resolve (env module) code)
     (multiple-value-bind (form constraints)
         (constrain (make-vargen) resolved)
-      (unif-apply (unify constraints) form))))
+      (values (unif-apply (unify constraints) form) next-module))))
 
 (defun make-vargen ()
   (let ((x 0))

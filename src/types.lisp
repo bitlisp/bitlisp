@@ -94,6 +94,11 @@
                  :constructor :func
                  :args (list* return-type arg-types)))
 
+(defun ftype? (type)
+  (and (typep type 'constructed-type)
+       ;; TODO: etc
+       (eq :func (constructor type))))
+
 (defun make-ptr (target-type)
   (make-instance 'constructed-type
                  ;; TODO: Real constructor

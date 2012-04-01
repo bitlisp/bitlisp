@@ -8,6 +8,7 @@
 
 (defclass var ()
   ((name :initarg :name :reader name)
+   (env :initarg :env :reader env)
    (var-type :initarg :var-type :accessor var-type)
    (llvm :initarg :llvm :accessor llvm)))
 

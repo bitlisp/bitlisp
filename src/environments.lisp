@@ -1,30 +1,13 @@
 (in-package #:bitlisp)
 
 (defclass environment ()
-  ((name :initform "anonymous" :initarg :name :accessor name)
-   (bindings :initform (make-hash-table :test 'eq)
+  ((bindings :initform (make-hash-table :test 'eq)
              :initarg :bindings :reader bindings)
    (parents :initform () :initarg :parents :accessor parents)
-   (id :initarg :id :reader id)
+   (module :initarg :module :accessor module)
    (toplevel? :initarg :toplevel? :accessor toplevel?)))
 
-(defvar *env-id-table* (make-array '(128)
-                                   :element-type 'environment
-                                   :adjustable t
-                                   :fill-pointer 0))
-
-(defun make-env (&key (name "anonymous") toplevel? parents)
-  (let ((obj (make-instance 'environment
-                            :id (fill-pointer *env-id-table*)
-                            :name name
-                            :parents parents
-                            :toplevel? toplevel?)))
-    (vector-push-extend obj *env-id-table*)
-    obj))
-
-(defvar *core-env* (make-env :name "core" :toplevel? t))
-
-(defun lookup (symbol &optional (env *core-env*))
+(defun lookup (symbol &optional (env (env *core-module*)))
   (when (stringp symbol)
     (setf symbol (make-bl-symbol symbol)))
   (if env

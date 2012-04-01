@@ -12,5 +12,6 @@
    (:file "values")
    (:file "unification")
    (:file "typechecking")
+   (:file "modules")
    (:file "codegen")
    (:file "primitives")))

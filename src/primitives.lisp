@@ -1,6 +1,6 @@
 (in-package #:bitlisp)
 
-(defmacro defspecial (name self args
+(defmacro defspecial (tgt-module name self args
                       (env &body resolver)
                       (vargen &body constrainer)
                       (unifier utype &body subst)
@@ -10,13 +10,18 @@
            (special-op-constrainer ,self) (lambda (,vargen ,@args) ,@constrainer)
            (special-op-subst ,self) (lambda (,unifier ,utype ,@args) ,@subst)
            (special-op-codegen ,self) (lambda (,module ,builder ,ctype ,@args) ,@codegen))
-     (bind *core-env* (make-bl-symbol ,name) ,self)))
+     (bind (env ,tgt-module) (make-bl-symbol ,name) ,self)))
 
-(defspecial "nlambda" self (name args &rest body)
+(defspecial *core-module* "nlambda" self (name args &rest body)
     (env
-      (let ((new-env (make-env :parents (list env) :toplevel? nil))
-            (name-var (make-instance 'var :name name))
-            (arg-vars (mapcar (lambda (sym) (make-instance 'var :name sym)) args)))
+      (let* ((new-env (make-instance 'environment
+                                     :parents (list env)
+                                     :toplevel? nil
+                                     :module (module env)))
+             (name-var (make-instance 'var :name name :env new-env))
+             (arg-vars (mapcar (lambda (sym)
+                                 (make-instance 'var :name sym :env new-env))
+                               args)))
         (bind new-env name name-var)
         (mapc (curry #'bind new-env) args arg-vars)
         (list* self name-var arg-vars
@@ -47,18 +52,18 @@
                  (list* self name args (mapcar (curry 'unif-apply unifier) body))))
     (module builder type
       (declare (ignore builder))
-      (prog1-let* ((func (llvm:add-function module (name (name name)) (llvm type)))
+      (prog1-let* ((func (llvm:add-function module (var-fqn name) (llvm type)))
                    (entry (llvm:append-basic-block func "entry")))
         (setf (llvm name) func)
         (mapc (lambda (param var) (setf (llvm var) param))
               (llvm:params func) args)
-        (llvm:with-builder (local-builder)
+        (llvm:with-object (local-builder builder)
           (llvm:position-builder-at-end local-builder entry)
           (loop :for (form . rest) :on body
                 :for genned := (codegen module local-builder form)
                 :unless rest :do (llvm:build-ret local-builder genned))))))
 
-(defspecial "if" self (condition then else)
+(defspecial *core-module* "if" self (condition then else)
     (env
       (list self (resolve env condition)
             (resolve env then) (resolve env else)))
@@ -101,9 +106,9 @@
                              (list then-result else-result)
                              (list then-block  else-block))))))
 
-(defspecial "def" self (name value)
+(defspecial *core-module* "def" self (name value)
     (env
-      (let ((var (make-instance 'var :name name)))
+      (let ((var (make-instance 'var :name name :env env)))
         (bind env name var)
         (list self var (resolve env value))))
     (vargen
@@ -121,10 +126,46 @@
     (module builder type
       ;; TODO: Nontrivial values
       (declare (ignore type))
-      (setf (llvm name) (codegen module builder value))))
+      (let ((llvm-value (codegen module builder value)))
+       (setf (llvm:value-name llvm-value) (var-fqn name)
+             (llvm name) llvm-value))))
+
+(defspecial *root-module* "module" self (name imports &rest exports)
+    (env
+      (assert (toplevel? env) () "Cannot change modules below the top level")
+      (let ((import-modules (mapcar (rcurry #'lookup env) imports)))
+        (let ((module (make-module name (module env)
+                                   import-modules
+                                   exports)))
+          (dolist (import import-modules)
+            (maphash (curry #'bind (env module)) (bindings (env import))))
+          (values (list* self name import-modules exports)
+                  module))))
+    (vargen
+      (declare (ignore vargen))
+      (make-form (lookup "Unit") (list* self name imports exports)))
+    (unifier utype
+      (declare (ignore unifier))
+      (make-form utype (print (list* self name imports exports))))
+    (lmodule builder type
+      (declare (ignore builder name exports type))
+      (dolist (import imports)
+        (maphash
+         (lambda (binding-name var)
+           (when (typep var 'var)
+             (let ((val (if (ftype? (var-type var))
+                            (llvm:add-function lmodule
+                                               (symbol-fqn import binding-name)
+                                               (llvm (var-type var)))
+                            (llvm:add-global lmodule
+                                             (var-type var)
+                                             (symbol-fqn import binding-name)))))
+               (setf (llvm:linkage val) :external
+                     (llvm var) val))))
+         (bindings (env import))))))
 
 (defmacro def-bl-type (name class &rest initargs)
-  `(bind *core-env* (make-bl-symbol ,name) (make-instance ',class ,@initargs)))
+  `(bind (env *core-module*) (make-bl-symbol ,name) (make-instance ',class ,@initargs)))
 
 (def-bl-type "Unit" unit-type)
 (def-bl-type "Float"  simple-type :llvm (llvm:float-type))
@@ -151,15 +192,18 @@
                                 :name ,symbol
                                 :var-type ,type)))
       (push (cons ,var (lambda (,module)
-                         (prog1-let* ((,func (llvm:add-function module ,name (llvm ,type)))
+                         (prog1-let* ((,func (llvm:add-function module ,(symbol-fqn *core-module* (make-bl-symbol name)) (llvm ,type)))
                                       (,entry (llvm:append-basic-block ,func "entry")))
-                           (llvm:with-builder (,builder)
+                           (mapc #'(setf llvm:value-name)
+                                 ',(mapcar (compose #'string-downcase #'first) args)
+                                 (llvm:params ,func))
+                           (llvm:with-object (,builder builder)
                              (llvm:position-builder-at-end builder ,entry)
                              (destructuring-bind ,(mapcar #'first args)
                                  (llvm:params ,func)
                                ,@llvm)))))
             *primfun-builders*)
-      (bind *core-env* ,symbol ,var))))
+      (bind (env *core-module*) ,symbol ,var))))
 
 (defprimfun "word+" "Word" ((lhs "Word") (rhs "Word"))
     (module builder type)

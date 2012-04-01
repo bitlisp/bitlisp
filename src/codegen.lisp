@@ -1,20 +1,36 @@
 (in-package #:bitlisp)
 
-(defun compile-full (forms &optional (outpath "./bitlisp.s"))
+(defun compile-full (sexps &optional (outpath "./bitlisp.s"))
   (with-tmp-file bc
-    (compile-module forms bc)
+    (compile-unit sexps :outpath bc)
     (ccl:run-program "opt" (list "-O3" "-o" bc bc))
     (ccl:run-program "llc" (list "-O3" "-o" outpath bc))))
 
-(defun compile-module (forms &optional (outpath "./bitlisp.bc"))
-  (llvm:with-module (module "bitlisp")
-    ;; TODO: Compile these once per compiler instance, or even load them from LLVM IR.
-    (build-primfuns module)
-    ;; nil builder indicates top level
-    (mapc (curry 'codegen module nil) forms)
-    (llvm:write-bitcode-to-file module outpath)))
+(defun compile-unit (sexps &key (base-module *root-module*) (outpath "./bitlisp.bc"))
+  (multiple-value-bind (module-form next-module) (build-types base-module (first sexps))
+    (assert (and (listp (form-code module-form))
+                 (eq (first (form-code module-form)) (lookup "module")))
+            ()
+            "Compilation units must begin with a module declaration! (got ~A)"
+            module-form)
+    (llvm:with-object (llvm-module module (module-fqn next-module))
+      (codegen llvm-module nil module-form)
+      (compile-in-module (mapcar (curry #'build-types next-module)
+                             (rest sexps))
+                      llvm-module
+                      outpath))))
 
-(defun codegen (module builder form)
+(defun compile-in-module (forms llvm-module &optional (outpath "./bitlisp.bc"))
+  ;; nil builder indicates top level
+  (mapc (curry 'codegen llvm-module nil) forms)
+  (llvm:write-bitcode-to-file llvm-module outpath))
+
+(defun compile-core ()
+  (llvm:with-object (lmodule module (module-fqn *core-module*))
+    (build-primfuns lmodule)
+    (llvm:write-bitcode-to-file lmodule "core.bc")))
+
+(defun codegen (llvm-module builder form)
   (destructuring-bind (type . code) form
     (etypecase code
       (integer (llvm:const-int (llvm type) code))
@@ -24,7 +40,9 @@
        (destructuring-bind (op &rest args) code
          (etypecase op
            (special-op (apply (special-op-codegen op)
-                              module builder type args))
-           (form (llvm:build-call builder (codegen module builder op)
-                                  (map 'vector (curry #'codegen module builder) args)
+                              llvm-module builder type args))
+           (form (llvm:build-call builder (codegen llvm-module builder op)
+                                  (map 'vector
+                                       (curry #'codegen llvm-module builder)
+                                       args)
                                   "result"))))))))
