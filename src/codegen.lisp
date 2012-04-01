@@ -25,16 +25,12 @@
             module-form)
     (llvm:with-object (llvm-module module (module-fqn next-module))
       (codegen llvm-module nil module-form)
-      (compile-in-module (mapcar (curry #'build-types next-module)
-                             (rest sexps))
-                      llvm-module
-                      outpath)
-      (llvm:dump-module llvm-module))))
-
-(defun compile-in-module (forms llvm-module &optional (outpath "./bitlisp.bc"))
-  ;; nil builder indicates top level
-  (mapc (curry 'codegen llvm-module nil) forms)
-  (llvm:write-bitcode-to-file llvm-module outpath))
+      ;; nil IR builder argument here indicates toplevel
+      ;; TODO: Toplevel forms should be permissible and execute at startup
+      (mapc (compose (curry #'codegen llvm-module nil)
+                     (curry #'build-types next-module))
+            (rest sexps))
+      (llvm:write-bitcode-to-file llvm-module outpath))))
 
 (defun codegen (llvm-module builder form)
   (destructuring-bind (type . code) form
@@ -44,7 +40,6 @@
                 (setf (llvm:initializer global) value
                       (llvm:linkage global) :private
                       (llvm:global-constant-p global) t)
-                (llvm:dump-value global)
                 (llvm:const-in-bounds-gep global
                                           (mapcar (curry #'llvm:const-int (llvm:int32-type))
                                                   '(0 0)))))
