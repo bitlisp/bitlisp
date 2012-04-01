@@ -2,16 +2,19 @@
 
 (defun compile-full (sexps &optional (outpath "./bitlisp.s"))
   (let ((root-module (make-root)))
-    (with-tmp-file bc
+    (with-tmp-file (bc "bitlisp-")
       (compile-unit sexps :base-module root-module
                           :outpath bc)
-      (with-tmp-file core
+      (with-tmp-file (core "bitlisp-core-")
         (llvm:with-object (core-module module ":core")
           (build-primfuns (lookup "core" (env root-module)) core-module)
           (llvm:write-bitcode-to-file core-module core))
-        (ccl:run-program "llvm-link" (list "-o" bc core bc)))
-      (ccl:run-program "opt" (list "-O3" "-o" bc bc))
-      (ccl:run-program "llc" (list "-O3" "-o" outpath bc)))))
+        (ccl:run-program "llvm-link" (list "-o" bc core bc)
+                         :output *standard-output* :error *error-output*))
+      (ccl:run-program "opt" (list "-O3" "-o" bc bc)
+                       :output *standard-output* :error *error-output*)
+      (ccl:run-program "llc" (list "-O3" "-o" outpath bc)
+                       :output *standard-output* :error *error-output*))))
 
 (defun compile-unit (sexps &key base-module (outpath "./bitlisp.bc"))
   (multiple-value-bind (module-form next-module) (build-types base-module (first sexps))
