@@ -41,7 +41,8 @@
                  (length (args right))))
          (unify (nconc (list (cons (constructor left) (constructor right)))
                        (mapcar #'cons (args left) (args right))
-                       rest)))))))
+                       rest)))
+        (t (error "Couldn't unify ~A with ~A" left right))))))
 
 (defun unif-apply (unifier form)
   (destructuring-bind (type . code) form
