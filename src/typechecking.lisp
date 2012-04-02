@@ -1,7 +1,7 @@
 (in-package #:bitlisp)
 
-(defun build-types (module code)
-  (multiple-value-bind (resolved next-module) (resolve (env module) code)
+(defun build-types (env code)
+  (multiple-value-bind (resolved next-module) (resolve env code)
     (multiple-value-bind (form constraints)
         (constrain (make-vargen) resolved)
       (values (unif-apply (unify constraints) form) next-module))))
@@ -27,7 +27,7 @@
                   (universal-type
                    (multiple-value-bind (local-type constraints)
                        (instantiate-type type vargen)
-                     (values (make-form local-type (form-code form))
+                     (values (make-form local-type form)
                              constraints)))
                   (t (make-form type form)))))
         (string (make-form (type-eval '("Ptr" "Byte")) form))

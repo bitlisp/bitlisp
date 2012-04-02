@@ -5,7 +5,8 @@
    (env :initarg :env :reader env)
    (parent :initarg :parent :reader parent)
    (imports :initarg :imports :reader imports)
-   (exports :initarg :exports :reader exports)))
+   (exports :initarg :exports :reader exports)
+   (object :initarg :object :initform nil :reader object)))
 
 (defun module-fqn (module)
   (if (null (name module))              ;Identifies root module

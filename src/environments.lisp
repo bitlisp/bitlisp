@@ -4,8 +4,14 @@
   ((bindings :initform (make-hash-table :test 'eq)
              :initarg :bindings :reader bindings)
    (parents :initform () :initarg :parents :accessor parents)
-   (module :initarg :module :accessor module)
+   (module :initform nil :initarg :module :accessor module)
    (toplevel? :initarg :toplevel? :accessor toplevel?)))
+
+(defun make-subenv (parent)
+  (make-instance 'environment
+                 :parents (list parent)
+                 :module (module parent)
+                 :toplevel? (toplevel? parent)))
 
 (defvar *primitives-env* (make-instance 'environment :toplevel? t)
   "Environment in which all primitive operators are bound")

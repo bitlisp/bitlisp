@@ -49,6 +49,16 @@
 (defun complete-type (type)
   (null (free-vars type)))
 
+(defclass quant-var ()
+  ((name :initarg :name :reader name)))
+
+(defmethod print-object ((type quant-var) stream)
+  (print-unreadable-object (type stream :type t)
+    (princ (name type) stream)))
+
+(defmethod bl-type= ((l quant-var) (r quant-var))
+  (eq l r))
+
 (defclass type-var ()
   ((number :initarg :number :reader number)))
 
@@ -152,6 +162,13 @@
     (values (subst-apply subst
                          (inner-type universal-type))
             (subst-constraints subst (constraints universal-type)))))
+
+(defun concretify-type (universal-type &rest types)
+  ;; TODO: Check that the concrete types fulfill the constraints
+  (let ((subst (reduce 'subst-compose
+                       (mapcar 'make-subst
+                               (variables universal-type) types))))
+    (subst-apply subst (inner-type universal-type))))
 
 (defmethod subst-apply (substitution (type universal-type))
   (declare (ignore substitution))

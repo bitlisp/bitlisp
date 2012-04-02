@@ -10,6 +10,7 @@
   ((name :initarg :name :reader name)
    (env :initarg :env :reader env)
    (var-type :initarg :var-type :accessor var-type)
+   (instantiator :initarg :instantiator :accessor instantiator)
    (llvm :initarg :llvm :accessor llvm)))
 
 (defmethod print-object ((value var) stream)

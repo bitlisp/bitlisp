@@ -18,7 +18,7 @@
                        :output *standard-output* :error *error-output*))))
 
 (defun compile-unit (sexps base-module &key (outpath "./bitlisp.bc") main-unit?)
-  (multiple-value-bind (module-form unit-module) (build-types base-module (first sexps))
+  (multiple-value-bind (module-form unit-module) (build-types (env base-module) (first sexps))
     (assert (and (listp (form-code module-form))
                  (eq (first (form-code module-form)) (lookup "module")))
             ()
@@ -29,7 +29,7 @@
       ;; nil IR builder argument here indicates toplevel
       ;; TODO: Toplevel forms should be permissible and execute at startup
       (mapc (compose (curry #'codegen llvm-module nil)
-                     (curry #'build-types unit-module))
+                     (curry #'build-types (env unit-module)))
             (rest sexps))
       (when main-unit?
         (multiple-value-bind (var exists?)
@@ -69,17 +69,21 @@
                                                   '(0 0)))))
       (integer (llvm:const-int (llvm type) code))
       (real (llvm:const-real (llvm type) code))
-      (var (llvm code))
+      (var (typecase (var-type code)
+             (universal-type
+              ;; TODO: Cache polymorphic instantiations
+              (apply (instantiator code) llvm-module
+                     (mapcar #'cdr (unify (list (cons (instantiate-type (var-type code)
+                                                                        (make-vargen))
+                                                      type))))))
+             (t (llvm code))))
       (list
        (destructuring-bind (op &rest args) code
          (etypecase op
            (special-op (apply (special-op-codegen op)
                               llvm-module builder type args))
-           (form (let ((func (codegen llvm-module builder op))
-                       (argvals (mapcar (curry #'codegen llvm-module builder)
+           (form (let ((argvals (mapcar (curry #'codegen llvm-module builder)
                                         args)))
-                   (mapc #'llvm:dump-value argvals)
-                   (prog1-let (call (llvm:build-call builder func
-                                                     argvals
-                                                     "result"))
+                   (prog1-let (call (llvm:build-call builder (codegen llvm-module builder op)
+                                                     argvals "result"))
                      (setf (llvm:instruction-calling-convention call) :fast))))))))))

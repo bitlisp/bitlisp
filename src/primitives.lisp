@@ -139,6 +139,10 @@
       (let ((final-type (generalize-type (subst-apply unifier type)))
             (value-form (unif-apply unifier value)))
         (setf (var-type name) final-type)
+        (when (typep final-type 'universal-type)
+          (setf (instantiator name) (lambda (llvm-module &rest vars)
+                                      (declare (ignore llvm-module vars))
+                                      (error "TODO"))))
         (make-form final-type
                    (list self name (make-form final-type (form-code value-form))))))
     (module builder type
@@ -169,11 +173,13 @@
       (dolist (import imports)
         (maphash
          (lambda (binding-name var)
-           (when (typep var 'var)
+           (when (and (typep var 'var)
+                      (not (typep (var-type var) 'universal-type)))
              (let ((val (if (ftype? (var-type var))
-                            (prog1-let (func (llvm:add-function lmodule
-                                                                (symbol-fqn import binding-name)
-                                                                (llvm (var-type var))))
+                            (prog1-let (func (llvm:add-function
+                                              lmodule
+                                              (symbol-fqn import binding-name)
+                                              (llvm (var-type var))))
                               (setf (llvm:function-calling-convention func) :fast))
                             (llvm:add-global lmodule
                                              (llvm (var-type var))
@@ -260,8 +266,10 @@
                  :args (list* return-type arg-types)))
 
 (defun ftype? (type)
-  (and (typep type 'constructed-type)
-       (eq (lookup "Func") (constructor type))))
+  (or (and (typep type 'constructed-type)
+           (eq (lookup "Func") (constructor type)))
+      (and (typep type 'universal-type)
+           (ftype? (inner-type type)))))
 
 (defun make-ptr (target-type)
   (make-instance 'constructed-type
@@ -339,10 +347,53 @@
     (module builder type)
   (llvm:build-ret builder (llvm:build-i-cmp builder :> lhs rhs "greater")))
 
-;; (defprimfun "load" (make-instance 'universal-type
-;;                                   :variables '(0)
-;;                                   :inner-type (make-ftype 0 (make-ptr 0))))
+(defmacro defprimpoly (name vars return-type args (builder) &body instantiator)
+  (with-gensyms (module sym type qvars subenv entry func)
+    `(let* ((,sym (make-bl-symbol ,name))
+            (,qvars (mapcar (lambda (n)
+                              (make-instance 'quant-var :name (make-bl-symbol n)))
+                            ',(mapcar #'string-downcase vars)))
+            (,type (let ((,subenv (make-subenv *primitives-env*)))
+                     (mapc (curry #'bind ,subenv)
+                           (mapcar #'name ,qvars)
+                           ,qvars)
+                     (destructuring-bind ,vars (mapcar #'name ,qvars)
+                       (make-instance 'universal-type
+                                      :variables ,qvars
+                                      :inner-type (type-eval (list "Func" ,return-type
+                                                                   ,@(mapcar #'second args))
+                                                             ,subenv))))))
+       (bind *primitives-env* ,sym
+             (make-instance 'var
+                            :var-type ,type
+                            :env *primitives-env*
+                            :name ,sym
+                            :instantiator
+                            (lambda (,module ,@vars)
+                              (prog1-let* ((,func (llvm:add-function
+                                                   ,module
+                                                   (concatenate 'string
+                                                                ;; FIXME: Hardcoded module path
+                                                                ":core:" ,name "!"
+                                                                (format nil "~{~A~^,~}"
+                                                                        (list ,@vars)))
+                                                   (llvm (concretify-type ,type ,@vars))))
+                                           (,entry (llvm:append-basic-block ,func "entry")))
+                                (setf (llvm:function-calling-convention ,func) :fast
+                                      (llvm:linkage ,func) :link-once-odr)
+                                (mapc #'(setf llvm:value-name)
+                                      ',(mapcar (compose #'string-downcase #'first) args)
+                                      (llvm:params ,func))
+                                (llvm:with-object (,builder builder)
+                                  (llvm:position-builder-at-end builder ,entry)
+                                  (destructuring-bind ,(mapcar #'first args)
+                                      (llvm:params ,func)
+                                    ,@instantiator)))))))))
 
-;; (defprimfun "store" (make-instance 'universal-type
-;;                                    :variables '(0)
-;;                                    :inner-type (make-ftype 0 (make-ptr 0))))
+(defprimpoly "load" (a) a ((pointer `("Ptr" ,a))) (builder)
+  (declare (ignore a))
+  (llvm:build-ret builder (llvm:build-load builder pointer "value")))
+(defprimpoly "store" (a) a ((pointer `("Ptr" ,a)) (value a)) (builder)
+  (declare (ignore a))
+  (llvm:build-store builder value pointer)
+  (llvm:build-ret builder value))
