@@ -31,7 +31,9 @@
 
 (defun bind (env symbol value)
   "Associate SYMBOL with VALUE in ENV"
-  (check-type symbol bl-symbol)
+  (etypecase symbol
+    (string (setf symbol (make-bl-symbol symbol)))
+    (bl-symbol))
   (multiple-value-bind (old-value exists) (gethash symbol (bindings env))
     (when exists
       (warn "Rebinding ~A to ~A (was ~A) in ~A" symbol value old-value env)))

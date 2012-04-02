@@ -32,10 +32,11 @@
   (let ((menv (or env
                   (make-instance 'environment
                                  :toplevel? t
-                                 :parents (if parent
-                                              (cons (env parent)
-                                                    (mapcar #'env imports))
-                                              (mapcar #'env imports))))))
+                                 :parents (when parent
+                                            (list (env parent)))))))
+    (dolist (import imports)
+      (dolist (sym (exports import))
+        (bind menv sym (lookup sym (env import)))))
     (prog1-let (mod (make-instance
                      'module
                      :name name
@@ -47,10 +48,15 @@
       (bind (env parent) name mod))))
 
 (defun make-root ()
-  (let ((root-env (make-instance 'environment :toplevel? t)))
+  (let ((root-env (make-instance 'environment :toplevel? t))
+        (primitives))
    (prog1-let (root (make-instance 'module
                                    :name nil
                                    :env root-env))
      (setf (module root-env) root)
-     (make-module (make-bl-symbol "core") root nil nil *primitives-env*)
+     (maphash (lambda (sym var)
+                (declare (ignore var))
+                (push sym primitives))
+              (bindings *primitives-env*))
+     (make-module (make-bl-symbol "core") root nil primitives *primitives-env*)
      (bind (env root) (make-bl-symbol "module") (lookup "module" *primitives-env*)))))
