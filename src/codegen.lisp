@@ -55,7 +55,7 @@
               (llvm:value-name (second params)) "argv")
         (llvm:position-builder-at-end builder entry)
         (let ((call (llvm:build-call builder (llvm internal-main) (llvm:params main)
-                                     "result")))
+                                     "")))
           (setf (llvm:instruction-calling-convention call) :fast)
           (llvm:build-ret builder call))))))
 
@@ -88,5 +88,5 @@
            (form (let ((argvals (mapcar (curry #'codegen llvm-module builder)
                                         args)))
                    (prog1-let (call (llvm:build-call builder (codegen llvm-module builder op)
-                                                     argvals "result"))
+                                                     argvals ""))
                      (setf (llvm:instruction-calling-convention call) :fast))))))))))

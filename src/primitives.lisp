@@ -226,7 +226,7 @@
                     (llvm name) blfunc)
               (llvm:with-object (builder builder)
                 (llvm:position-builder-at-end builder entry)
-                (llvm:build-ret builder (llvm:build-call builder cfunc (llvm:params blfunc) "result"))))))
+                (llvm:build-ret builder (llvm:build-call builder cfunc (llvm:params blfunc) ""))))))
 
 (defmacro defctor (name (&rest args) &body builder)
   (with-gensyms (sym)
