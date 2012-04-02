@@ -1,6 +1,6 @@
 (in-package #:bitlisp)
 
-(defun compile-full (sexps &optional (outpath "./bitlisp.s"))
+(defun compile-full (sexps &key (outpath "./bitlisp.s") (speed 3))
   (let ((root-module (make-root)))
     (with-tmp-file (bc "bitlisp-")
       (compile-unit sexps root-module
@@ -12,10 +12,11 @@
           (llvm:write-bitcode-to-file core-module core))
         (ccl:run-program "llvm-link" (list "-o" bc core bc)
                          :output *standard-output* :error *error-output*))
-      (ccl:run-program "opt" (list "-O3" "-o" bc bc)
-                       :output *standard-output* :error *error-output*)
-      (ccl:run-program "llc" (list "-O3" "-o" outpath bc)
-                       :output *standard-output* :error *error-output*))))
+      (let ((opt (format nil "-O~D" speed)))
+        (ccl:run-program "opt" (list opt "-o" bc bc)
+                        :output *standard-output* :error *error-output*)
+        (ccl:run-program "llc" (list opt "-o" outpath bc)
+                         :output *standard-output* :error *error-output*)))))
 
 (defun compile-unit (sexps base-module &key (outpath "./bitlisp.bc") main-unit?)
   (multiple-value-bind (module-form unit-module) (build-types (env base-module) (first sexps))
