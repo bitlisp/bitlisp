@@ -14,4 +14,5 @@
    (:file "typechecking")
    (:file "modules")
    (:file "codegen")
+   (:file "specials")
    (:file "primitives")))
