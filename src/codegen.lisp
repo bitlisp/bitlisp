@@ -28,10 +28,12 @@
     (llvm:with-object (llvm-module module (module-fqn unit-module))
       (codegen llvm-module nil module-form)
       ;; nil IR builder argument here indicates toplevel
-      ;; TODO: Toplevel forms should be permissible and execute at startup
+      ;; TODO: Toplevel forms should be permissible and execute before main
       (mapc (compose (curry #'codegen llvm-module nil)
                      (curry #'build-types (env unit-module)))
             (rest sexps))
+      (dolist (export (exports unit-module))
+        (setf (llvm:linkage (llvm (lookup export (env unit-module)))) :external))
       (when main-unit?
         (multiple-value-bind (var exists?)
             (lookup "main" (env unit-module))

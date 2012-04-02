@@ -151,7 +151,7 @@
       (unless (typep type 'universal-type)
         (let ((llvm-value (codegen module builder value)))
           (setf (llvm:value-name llvm-value) (var-fqn name)
-                (llvm:linkage llvm-value) :external
+                (llvm:linkage llvm-value) :internal
                 (llvm name) llvm-value)))))
 
 (defspecial "module" self (name imports &rest exports)
@@ -172,22 +172,21 @@
     (lmodule builder type
       (declare (ignore builder name exports type))
       (dolist (import imports)
-        (maphash
-         (lambda (binding-name var)
-           (when (and (typep var 'var)
-                      (not (typep (var-type var) 'universal-type)))
-             (let ((val (if (ftype? (var-type var))
-                            (prog1-let (func (llvm:add-function
-                                              lmodule
-                                              (symbol-fqn import binding-name)
-                                              (llvm (var-type var))))
-                              (setf (llvm:function-calling-convention func) :fast))
-                            (llvm:add-global lmodule
-                                             (llvm (var-type var))
-                                             (symbol-fqn import binding-name)))))
-               (setf (llvm:linkage val) :external
-                     (llvm var) val))))
-         (bindings (env import))))))
+        (dolist (export (exports import))
+          (let ((remote-binding (lookup export (env import))))
+            (when (and (typep remote-binding 'var)
+                       (not (typep (var-type remote-binding) 'universal-type)))
+              (let ((val (if (ftype? (var-type remote-binding))
+                             (prog1-let (func (llvm:add-function
+                                               lmodule
+                                               (symbol-fqn import export)
+                                               (llvm (var-type remote-binding))))
+                               (setf (llvm:function-calling-convention func) :fast))
+                             (llvm:add-global lmodule
+                                              (llvm (var-type remote-binding))
+                                              (symbol-fqn import export)))))
+                (setf (llvm:linkage val) :external
+                      (llvm remote-binding) val))))))))
 
 (defspecial "the" self (type value)
     (env (list self (type-eval type env) (resolve env value)))
