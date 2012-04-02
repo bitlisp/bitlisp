@@ -141,17 +141,18 @@
         (setf (var-type name) final-type)
         (when (typep final-type 'universal-type)
           (setf (instantiator name) (lambda (llvm-module &rest vars)
-                                      (declare (ignore llvm-module vars))
-                                      (error "TODO"))))
+                                      (codegen llvm-module nil
+                                               (apply #'instantiate-value
+                                                      final-type (form-code value-form) vars)))))
         (make-form final-type
                    (list self name (make-form final-type (form-code value-form))))))
     (module builder type
       ;; TODO: Non-function values
-      (declare (ignore type))
-      (let ((llvm-value (codegen module builder value)))
-        (setf (llvm:value-name llvm-value) (var-fqn name)
-              (llvm:linkage llvm-value) :external
-              (llvm name) llvm-value))))
+      (unless (typep type 'universal-type)
+        (let ((llvm-value (codegen module builder value)))
+          (setf (llvm:value-name llvm-value) (var-fqn name)
+                (llvm:linkage llvm-value) :external
+                (llvm name) llvm-value)))))
 
 (defspecial "module" self (name imports &rest exports)
     (env
@@ -374,8 +375,8 @@
                                                    ,module
                                                    (concatenate 'string
                                                                 ;; FIXME: Hardcoded module path
-                                                                ":core:" ,name "!"
-                                                                (format nil "~{~A~^,~}"
+                                                                ":core:" ,name
+                                                                (format nil "~{!~A~}"
                                                                         (list ,@vars)))
                                                    (llvm (concretify-type ,type ,@vars))))
                                            (,entry (llvm:append-basic-block ,func "entry")))

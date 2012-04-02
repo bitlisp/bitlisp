@@ -163,16 +163,16 @@
                          (inner-type universal-type))
             (subst-constraints subst (constraints universal-type)))))
 
+(defmethod subst-apply (substitution (type universal-type))
+  (declare (ignore substitution))
+  (error "Tried to apply a substitution to ~A" type))
+
 (defun concretify-type (universal-type &rest types)
   ;; TODO: Check that the concrete types fulfill the constraints
   (let ((subst (reduce 'subst-compose
                        (mapcar 'make-subst
                                (variables universal-type) types))))
     (subst-apply subst (inner-type universal-type))))
-
-(defmethod subst-apply (substitution (type universal-type))
-  (declare (ignore substitution))
-  (error "Tried to apply a substitution to ~A" type))
 
 (defclass product-type (bl-type)
   ((args :initarg :args :reader args)))

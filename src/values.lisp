@@ -13,6 +13,7 @@
    (instantiator :initarg :instantiator :accessor instantiator)
    (llvm :initarg :llvm :accessor llvm)))
 
+
 (defmethod print-object ((value var) stream)
   (print-unreadable-object (value stream :type t)
     (princ (name value) stream)))
@@ -27,3 +28,10 @@
 
 (defun form-code (form)
   (cdr form))
+
+(defun instantiate-value (utype code &rest types)
+  ;; TODO: Check that the concrete types fulfill the constraints
+  (let ((subst (reduce 'subst-compose
+                       (mapcar 'make-subst
+                               (variables utype) types))))
+    (unif-apply subst (make-form (inner-type utype) code))))
