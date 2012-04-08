@@ -2,7 +2,7 @@
 
 (define-parser *parser*
   (:start-symbol sexp)
-  (:terminals (lparen rparen symbol integer single-float double-float string quote))
+  (:terminals (lparen rparen symbol integer ratio string quote))
 
   (sexp
    (lparen sexps rparen (lambda (a b c) (declare (ignore a c)) (nreverse b)))
@@ -15,8 +15,7 @@
   (atom
    symbol
    integer
-   single-float
-   double-float
+   ratio
    string))
 
 (defun whitespace? (char)
@@ -100,12 +99,13 @@
                     (return (values 'string (read-string stream))))
                    ((digit-char-p char)
                     (unread-char char stream)
+                    ;; TODO: Lossless float parsing
                     (let ((number (parse-number (buffer-atom stream))))
                       (return (values (etypecase number
                                         (integer 'integer)
-                                        (single-float 'single-float)
-                                        (double-float 'double-float))
-                                      number))))
+                                        (single-float 'ratio)
+                                        (double-float 'ratio))
+                                      (rationalize number)))))
                    (t
                     (unread-char char stream)
                     (return (values 'symbol (make-bl-symbol (buffer-atom stream))))))))
