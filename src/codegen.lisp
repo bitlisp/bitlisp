@@ -20,7 +20,8 @@
                            :output *standard-output* :error *error-output*))))))
 
 (defun compile-unit (sexps base-module &key (outpath "./bitlisp.bc") main-unit?)
-  (multiple-value-bind (module-form unit-module) (build-types (env base-module) (first sexps))
+  (multiple-value-bind (module-form predicates unit-module)
+      (build-types (env base-module) (first sexps))
     (assert (and (listp (form-code module-form))
                  (eq (first (form-code module-form)) (lookup "module")))
             ()
@@ -73,14 +74,10 @@
                                                   '(0 0)))))
       (integer (llvm:const-int (llvm type) code))
       (real (llvm:const-real (llvm type) code))
-      (var (typecase (var-type code)
-             (universal-type
-              ;; TODO: Cache polymorphic instantiations
-              (apply (instantiator code) llvm-module
-                     (mapcar #'cdr (unify (list (cons (instantiate-type (var-type code)
-                                                                        (make-vargen))
-                                                      type))))))
-             (t (llvm code))))
+      (var (if (length (vars type))
+               ;; TODO: Cache polymorphic instantiations
+               (funcall (llvm code) llvm-module type)
+               (llvm code)))
       (list
        (destructuring-bind (op &rest args) code
          (etypecase op

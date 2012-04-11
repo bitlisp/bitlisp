@@ -11,7 +11,7 @@
    (:file "types")
    (:file "values")
    (:file "unification")
-   (:file "typechecking")
+   (:file "inference")
    (:file "modules")
    (:file "codegen")
    (:file "specials")

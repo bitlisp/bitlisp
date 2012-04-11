@@ -42,20 +42,20 @@
 (defun unbind (env symbol)
   (remhash symbol (bindings env)))
 
-(defun resolve (env form)
+(defun resolve (env source)
   "Lower code into internal representations"
-  (etypecase form
+  (etypecase source
     (null nil)
     (bl-symbol
-     (multiple-value-bind (place exists) (lookup form env)
+     (multiple-value-bind (place exists) (lookup source env)
        (if exists
 	   place
-	   (error "~A names no binding" form))))
+	   (error "~A names no binding" source))))
     (list
-     (destructuring-bind (operator &rest args) form
+     (destructuring-bind (operator &rest args) source
        (let ((op (resolve env operator)))
 	 (typecase op
 	   ;(macro (error "TODO: Macroexpansion"))
 	   (special-op (apply (special-op-resolver op) env args))
 	   (t (cons op (mapcar (curry #'resolve env) args)))))))
-    ((or string integer single-float double-float) form)))
+    ((or string integer single-float double-float) source)))

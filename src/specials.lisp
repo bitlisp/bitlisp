@@ -2,81 +2,49 @@
 
 (defmacro defspecial (name self (&rest args)
                       (env &body resolver)
-                      &optional
-                        ((vargen &body constrainer) nil crsupplied?)
-                        ((unifier utype &body subst) '(nil nil) ufsupplied?)
-                        ((module builder ctype &body codegen) '(nil nil nil) cgsupplied?))
-  (let ((errlambda `(lambda (&rest args)
-                      (declare (ignore args))
-                      (error ,(concatenate 'string
-                                           "Internal error: Special op " name
-                                           " present at invalid stage!")))))
-   `(let ((,self (make-special-op :name ,name)))
-      (setf (special-op-resolver ,self) (lambda (,env ,@args) ,@resolver)
-            (special-op-constrainer ,self) ,(if crsupplied?
-                                                `(lambda (,vargen ,@args)
-                                                   ,@constrainer)
-                                                errlambda)
-            (special-op-subst ,self) ,(if ufsupplied?
-                                          `(lambda (,unifier ,utype ,@args)
-                                             ,@subst)
-                                          errlambda)
-            (special-op-codegen ,self) ,(if cgsupplied?
-                                            `(lambda (,module ,builder ,ctype ,@args)
-                                               ,@codegen)
-                                            errlambda))
-      (bind *primitives-env* (make-bl-symbol ,name) ,self))))
+                      (&body inferrer)
+                      (module builder ctype &body codegen))
+  `(let ((,self (make-special-op :name ,name)))
+     (setf (special-op-resolver ,self) (lambda (,env ,@args) ,@resolver)
+           (special-op-inferrer ,self) (lambda (,@args)
+                                         ,@inferrer)
+           (special-op-codegen ,self) (lambda (,module ,builder ,ctype ,@args)
+                                        ,@codegen))
+     (bind *primitives-env* (make-bl-symbol ,name) ,self)))
 
-(defspecial "nlambda" self (name args &rest body)
+(defspecial "lambda" self (args &rest body)
     (env
       (let* ((new-env (make-instance 'environment
                                      :parents (list env)
                                      :toplevel? nil
                                      :module (module env)))
-             (name-var (make-instance 'var :name name :env new-env))
              (arg-vars (mapcar (lambda (sym)
                                  (make-instance 'var :name sym :env new-env))
                                args)))
-        (bind new-env name name-var)
         (mapc (curry #'bind new-env) args arg-vars)
-        (list* self name-var arg-vars
+        (list* self arg-vars
                (mapcar (curry #'resolve new-env) body))))
-    (vargen
-     ;; TODO: Probably shouldn't mutate here.
-      (setf (var-type name) (funcall vargen))
-      (mapc (lambda (v) (setf (var-type v) (funcall vargen))) args)
-      (loop :with constraints := nil
-            :with forms := nil
-            :for form :in body
-            :do (multiple-value-bind (new-form new-constraints)
-                    (constrain vargen form)
-                  (push new-form forms)
-                  (push new-constraints constraints))
-            :finally (let ((ftype (apply #'make-ftype
-                                         (form-type (first forms))
-                                         (mapcar #'var-type args))))
-                       (return
-                         (values
-                          (make-form ftype
-                                     (list* self name args (nreverse forms)))
-                          (apply #'nconc (list (cons ftype (var-type name))) constraints))))))
-    (unifier type
-      (setf (var-type name) (subst-apply unifier (var-type name)))
-      (mapc (lambda (v) (setf (var-type v) (subst-apply unifier (var-type v)))) args)
-      (make-form (subst-apply unifier type)
-                 (list* self name args (mapcar (curry 'unif-apply unifier) body))))
+    (;; TODO: Probably shouldn't mutate here.
+     (let ((arg-types (loop :repeat (length args) :collect (make-instance 'tyvar :kind 1))))
+       (mapc (lambda (var ty) (setf (var-type var) (to-scheme ty)))
+             args arg-types)
+       (multiple-value-bind (forms preds subst) (infer-expr-seq body)
+         (values (make-form (make-ftype (apply #'make-prodty arg-types)
+                                        (form-type (lastcar forms)))
+                            (list* self args forms))
+                 preds
+                 subst))))
     (module builder type
       (declare (ignore builder))
-      (prog1-let* ((func (llvm:add-function module (var-fqn name) (llvm type)))
-                   (entry (llvm:append-basic-block func "entry")))
+      (prog1-let (func (llvm:add-function module "lambda" (llvm type)))
         (setf (llvm:linkage func) :internal
-              (llvm:function-calling-convention func) :fast
-              (llvm name) func)
+              (llvm:function-calling-convention func) :fast)
         (mapc (lambda (param var) (setf (llvm var) param
                                         (llvm:value-name param) (name (name var))))
               (llvm:params func) args)
         (llvm:with-object (local-builder builder)
-          (llvm:position-builder-at-end local-builder entry)
+          (llvm:position-builder-at-end local-builder
+                                        (llvm:append-basic-block func "entry"))
           (loop :for (form . rest) :on body
                 :for genned := (codegen module local-builder form)
                 :unless rest :do (llvm:build-ret local-builder genned))))))
@@ -85,14 +53,14 @@
     (env
       (list self (resolve env condition)
             (resolve env then) (resolve env else)))
-    (vargen
-      (multiple-value-bind (cform ccons) (constrain vargen condition)
-        (multiple-value-bind (tform tcons) (constrain vargen then)
-          (multiple-value-bind (eform econs) (constrain vargen else)
-            (values (make-form (form-type tform) (list self cform tform eform))
-                    (nconc (list (cons (form-type tform)
-                                       (form-type eform)))
-                           ccons tcons econs))))))
+    ((multiple-value-bind (cform ccons cpreds) (constrain condition)
+       (multiple-value-bind (tform tcons tpreds) (constrain then)
+         (multiple-value-bind (eform econs epreds) (constrain else)
+           (values (make-form (form-type tform) (list self cform tform eform))
+                   (nconc (list (cons (form-type tform)
+                                      (form-type eform)))
+                          ccons tcons econs)
+                   (nconc cpreds tpreds epreds))))))
     (unifier type
       (make-form (subst-apply unifier type)
                  (list self
@@ -129,26 +97,21 @@
       (let ((var (make-instance 'var :name name :env env)))
         (bind env name var)
         (list self var (resolve env value))))
-    (vargen
-      (multiple-value-bind (vform vcons)
-          (constrain vargen value)
-        (values
-         (make-form (form-type vform) (list self name vform))
-         vcons)))
-    (unifier type
-      (let ((final-type (generalize-type (subst-apply unifier type)))
-            (value-form (unif-apply unifier value)))
-        (setf (var-type name) final-type)
-        (when (typep final-type 'universal-type)
-          (setf (instantiator name) (lambda (llvm-module &rest vars)
-                                      (codegen llvm-module nil
-                                               (apply #'instantiate-value
-                                                      final-type (form-code value-form) vars)))))
-        (make-form final-type
-                   (list self name (make-form final-type (form-code value-form))))))
+    ((setf (var-type name) (to-scheme (make-instance 'tyvar :kind 1)))
+      (multiple-value-bind (vform vpreds vsubst)
+          (infer-expr value)
+        (let* ((final-subst (subst-compose
+                             vsubst
+                             (unify (head (fresh-instance (var-type name)))
+                                                  (form-type vform))))
+               (vty (subst-apply final-subst (form-type vform))))
+          ;; TODO: Propogate quantification substitution to form body
+          (values (quantify-form (free-vars vty) vpreds (make-form vty (list self name (subst-code final-subst vform))))
+                  nil))))
     (module builder type
       ;; TODO: Non-function values
-      (unless (typep type 'universal-type)
+      ;; TODO: Auto-create pointer specialization
+      (unless (length (vars type))
         (let ((llvm-value (codegen module builder value)))
           (setf (llvm:value-name llvm-value) (var-fqn name)
                 (llvm:linkage llvm-value) :internal
@@ -190,11 +153,12 @@
 
 (defspecial "the" self (type value)
     (env (list self (type-eval type env) (resolve env value)))
-    (vargen
-      (multiple-value-bind (value-form constraints) (constrain vargen value)
-        (values value-form
-                (cons (cons type (form-type value-form))
-                      constraints)))))
+    ((multiple-value-bind (form preds subst) (infer-expr value)
+       (values form preds
+               (subst-compose subst (unify (form-type form) type)))))
+    (m b ty
+      (declare (ignore m b ty type value))
+      (error "What's this doing here?")))
 
 (defspecial "cdef" self (name return-type &rest args)
     (env

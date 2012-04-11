@@ -2,9 +2,10 @@
 
 (defgeneric free-vars (type)
   (:method (type)
-    (if (typevar? type)
-        (list type)
-        nil)))
+    (declare (ignore type))
+    nil)
+  (:method ((types list))
+    (delete-duplicates (mapcan #'free-vars types))))
 (defgeneric bl-type= (a b)
   (:method (a b)
     "Base case to catch incompatible types"
@@ -14,21 +15,23 @@
     "Integral types intended for use as primitive constructor parameters"
     (= a b)))
 (defgeneric subst-apply (substitution thing)
-  (:method (s thing)
-    "Default implementation for simple, flat substitutions"
-    (loop :for (var . value) :in s
-          :do (when (bl-type= var thing)
-                (setf thing value)))
-    thing))
+  (:method (s ty)
+    (declare (ignore s))
+    ty)
+  (:method (s (list list))
+    (mapcar (curry #'subst-apply s) list)))
 
-(defun type-eval (code &optional (env *primitives-env*))
-  (etypecase code
-    (integer code)
-    ((or bl-symbol string) (lookup code env))
-    (list (destructuring-bind (constructor &rest args) code
-            (make-instance 'constructed-type
-                           :constructor (type-eval constructor env)
-                           :args (mapcar (rcurry #'type-eval env) args))))))
+;;; Substitutions are alists of the form ((var1 . value1) (var2 . value2))
+(defun make-subst (var value)
+  "Create a substitution consisting of a single replacement of the form var := value"
+  (list (cons var value)))
+
+(defun subst-compose (sigma gamma)
+  "Compose two substitutions (see TAPL 22.1.1)"
+  (nconc (loop :for (var . value) :in gamma
+               :nconc (make-subst var (subst-apply sigma value)))
+         (remove-if (lambda (x) (find x gamma :key #'car))
+                    sigma)))
 
 (defun subst-constraints (substitutions constraints)
   (mapcar (lambda (constraint)
@@ -37,158 +40,336 @@
                     (subst-apply substitutions r))))
           constraints))
 
-(defun constraint= (a b)
-  "Check that two equality constraints are interchangable."
-  (check-type a cons)
-  (check-type b cons)
-  (or (and (bl-type= (car a) (car b))
-           (bl-type= (cdr a) (cdr b)))
-      (and (bl-type= (car a) (cdr b))
-           (bl-type= (cdr a) (car b)))))
-
-(defun complete-type (type)
-  (null (free-vars type)))
-
-(defclass quant-var ()
-  ((name :initarg :name :reader name)))
-
-(defmethod print-object ((type quant-var) stream)
-  (print-unreadable-object (type stream :type t)
-    (princ (name type) stream)))
-
-(defmethod bl-type= ((l quant-var) (r quant-var))
-  (eq l r))
-
-(defclass type-var ()
-  ((number :initarg :number :reader number)))
-
-(defmethod bl-type= ((l type-var) (r type-var))
-  (= (number l) (number r)))
-
-(defmethod print-object ((type type-var) stream)
-  (print-unreadable-object (type stream)
-    (format stream "t~D" (number type))))
-
-(defun typevar? (x)
-  (typep x 'type-var))
+(defgeneric kind (type)
+  (:documentation "An integer ≥1 indicating type constructor arity."))
 
 (defclass bl-type () ())
 
-(defclass simple-type (bl-type)
+(defclass tyvar (bl-type)
+  ((kind :initarg :kind :reader kind)))
+
+(defmethod subst-apply (s (var tyvar))
+  (or (cdr (assoc var s)) var))
+
+(defmethod bl-type= ((a tyvar) (b tyvar))
+  (eq a b))
+
+(defmethod free-vars ((var tyvar))
+  (list var))
+
+(defclass tygen (bl-type)
+  ((number :initarg :number :reader number)
+   (kind :initarg :kind :reader kind)))
+
+(defmethod print-object ((ty tygen) stream)
+  (print-unreadable-object (ty stream :type t)
+    (princ (number ty) stream)))
+
+(defmethod bl-type= ((a tygen) (b tygen))
+  (and (= (number a) (number b))
+       (= (kind a) (kind b))))
+
+(defclass tycon (bl-type)
   ((name :initarg :name :reader name)
+   (kind :initarg :kind :reader kind)
    (llvm :initarg :llvm :reader llvm)))
 
-(defmethod print-object ((type simple-type) stream)
-  (print-unreadable-object (type stream)
-    (princ (name type) stream)))
+(defmethod print-object ((ty tycon) stream)
+  (print-unreadable-object (ty stream)
+    (princ (name ty) stream)))
 
-(defclass machine-int (bl-type)
-  ((bits :initarg :bits :reader bits)
-   (signed :initarg :signed :reader signed)))
+(defmethod bl-type= ((a tycon) (b tycon))
+  (eq a b))
 
-(defmethod llvm ((type machine-int))
-  (llvm:int-type (bits type)))
-
-(defmethod print-object ((type machine-int) stream)
-  (print-unreadable-object (type stream)
-    (format stream "~:[u~;~]int~D" (signed type) (bits type))))
-
-(defmethod bl-type= ((a machine-int) (b machine-int))
-  (and (= (bits a) (bits b))
-       (eq (signed a) (signed b))))
-
-(defclass type-constructor ()
-  ((name :initarg :name :reader name)
-   (llvm :initarg :llvm :reader llvm)))
-
-(defmethod print-object ((ctor type-constructor) stream)
-  (print-unreadable-object (ctor stream :type t)
-    (princ (name ctor) stream)))
-
-(defmethod bl-type= ((l type-constructor) (r type-constructor))
-  (eq l r))
-
-(defclass constructed-type (bl-type)
-  ((constructor :initarg :constructor :reader constructor)
+(defclass tyapp (bl-type)
+  ((operator :initarg :operator :reader operator)
    (args :initarg :args :reader args)))
 
-(defmethod free-vars ((type constructed-type))
-  (remove-duplicates
-   (nconc (free-vars (constructor type))
-          (reduce 'nconc (args type)
-                  :key 'free-vars))))
+(defmethod print-object ((ty tyapp) stream)
+  (print-unreadable-object (ty stream :type t)
+    (format stream "~A~{ ~A~}" (name (operator ty)) (args ty))))
 
-(defmethod bl-type= ((a constructed-type) (b constructed-type))
-  (and (eq (constructor a) (constructor b))
+(defmethod kind ((type tyapp))
+  (- (kind (operator type)) (length (args type))))
+
+(defmethod subst-apply (s (app tyapp))
+  (make-instance 'tyapp
+                 :operator (subst-apply s (operator app))
+                 :args (mapcar (curry #'subst-apply s) (args app))))
+
+(defmethod bl-type= ((a tyapp) (b tyapp))
+  (and (bl-type= (operator a) (operator b))
        (every #'bl-type= (args a) (args b))))
 
-(defmethod print-object ((type constructed-type) stream)
-  (print-unreadable-object (type stream)
-    (format stream "~A~{ ~A~}" (name (constructor type)) (args type))))
+(defmethod free-vars ((type tyapp))
+  (delete-duplicates (nconc (free-vars (operator type))
+                            (free-vars (args type)))))
 
-(defmethod subst-apply (substitution (type constructed-type))
-  (make-instance 'constructed-type
-                 :constructor (subst-apply substitution (constructor type))
-                 :args (mapcar (curry 'subst-apply substitution) (args type))))
+(defmethod llvm ((ty tyapp))
+  (assert (= 1 (kind ty)) ()
+          "~A has kind ~A ≠ 1 and therefore cannot exist at runtime!"
+          ty)
+  (apply (llvm (operator ty)) (args ty)))
 
-(defmethod llvm ((type constructed-type))
-  (apply (llvm (constructor type)) (args type)))
+(defclass tyqual (bl-type)
+  ((context :initarg :context :reader context
+            :documentation "List of predicates")
+   (head :initarg :head :reader head)))
 
-(defclass universal-type (bl-type)
-  ((variables :initarg :variables :reader variables)
-   (constraints :initarg :constraints :initform nil :reader constraints)
-   (inner-type :initarg :inner-type :reader inner-type)))
+(defmethod print-object ((ty tyqual) stream)
+  (print-unreadable-object (ty stream :type t)
+    (format stream "(~{~A~^ ~}) ~A" (context ty) (head ty))))
 
-(defmethod print-object ((type universal-type) stream)
-  (print-unreadable-object (type stream)
-    (format stream "∀ (~{~A~^ ~}) (~{~A~^ ~}) ~A"
-            (variables type) (constraints type) (inner-type type))))
+(defmethod subst-apply (s (qual tyqual))
+  (make-instance 'tyqual
+                 :context (subst-apply s (context qual))
+                 :head (subst-apply s (head qual))))
 
-(defmethod free-vars ((type universal-type))
-  (remove-if (rcurry #'member (variables type))
-             (free-vars (inner-type type))))
+(defmethod free-vars ((qual tyqual))
+  (delete-duplicates (nconc (free-vars (context qual))
+                            (free-vars (head qual)))))
 
-(defmethod bl-type= ((a universal-type) (b universal-type))
-  (and (= (length (variables a)) (length (variables b)))
-       (let ((subst (reduce 'subst-compose (mapcar 'make-subst
-                                                   (variables b) (variables a)))))
-         (every #'constraint= (constraints a) (subst-constraints subst (constraints b)))
-         (bl-type= (inner-type a) (subst-apply subst (inner-type b))))))
+(defmethod bl-type= ((a tyqual) (b tyqual))
+  (and (every #'bl-type= (context a) (context b))
+       (bl-type= (head a) (head b))))
 
-(defun instantiate-type (universal-type vargen)
-  (check-type universal-type universal-type)
-  (let ((subst (mapcar (lambda (x) (cons x (funcall vargen)))
-                       (variables universal-type))))
-    (values (subst-apply subst
-                         (inner-type universal-type))
-            (subst-constraints subst (constraints universal-type)))))
+(defmethod llvm ((ty tyqual))
+  "Passes through to head"
+  (llvm (head ty)))
 
-(defmethod subst-apply (substitution (type universal-type))
-  (declare (ignore substitution))
-  (error "Tried to apply a substitution to ~A" type))
+(defun qualify (context head)
+  (make-instance 'tyqual :context context :head head))
 
-(defun concretify-type (universal-type &rest types)
-  ;; TODO: Check that the concrete types fulfill the constraints
-  (let ((subst (reduce 'subst-compose
-                       (mapcar 'make-subst
-                               (variables universal-type) types))))
-    (subst-apply subst (inner-type universal-type))))
+(defclass pred ()
+  ((iface :initarg :iface :reader iface)
+   (args :initarg :args :reader args)))
 
-(defclass product-type (bl-type)
-  ((args :initarg :args :reader args)))
+(defmethod print-object ((p pred) stream)
+  (print-unreadable-object (p stream)
+    (format stream "~A~{ ~A~}" (iface p) (args p))))
 
-(defmethod print-object ((type product-type) stream)
-  (print-unreadable-object (type stream :type t)
-    (format stream "~{~A~^ ~}" (args type))))
+(defmethod subst-apply (s (pred pred))
+  (make-instance 'pred
+                 :iface (iface pred)
+                 :args (subst-apply s (args pred))))
 
-(defmethod free-vars ((type product-type))
-  (remove-duplicates (reduce 'nconc (args type)
-                             :key 'free-vars)))
+(defmethod free-vars ((pred pred))
+  (free-vars (args pred)))
 
-(defmethod bl-type= ((a product-type) (b product-type))
-  (and (= (length (args a)) (length (args b)))
+(defmethod bl-type= ((a pred) (b pred))
+  (and (eq (iface a) (iface b))
        (every #'bl-type= (args a) (args b))))
 
-(defmethod subst-apply (substitution (type product-type))
-  (make-instance 'product-type
-                 :args (mapcar (curry 'subst-apply substitution) (args type))))
+(defun make-pred (iface &rest args)
+  (make-instance 'pred
+                 :iface iface
+                 :args args))
+
+
+(defun tyapply (operator &rest args)
+  (typecase operator
+    (tyapp (make-instance 'tyapp
+                          :operator (operator operator)
+                          :args (append (args operator) args)))
+    (t (make-instance 'tyapp :operator operator :args args))))
+
+(defun type-eval (code &optional (env *primitives-env*))
+  (etypecase code
+    ((or integer tygen tyapp) code)
+    ((or bl-symbol string) (lookup code env))
+    (list (destructuring-bind (constructor &rest args)
+              (mapcar (rcurry #'type-eval env) code)
+            (apply #'tyapply constructor args)))))
+
+(defun constraint-eval (code &optional (env *primitives-env*))
+  (destructuring-bind (iface &rest args) code
+    (make-instance 'pred
+                   :iface (lookup iface env)
+                   :args (mapcar (rcurry #'type-eval env) args))))
+
+(defun make-ftype (arg-type return-type)
+  (tyapply (lookup "Func") arg-type return-type))
+
+(defun make-prodty (&rest types)
+  (case (length types)
+    (0 (lookup "Unit"))
+    (1 (first types))
+    (otherwise (make-instance 'tyapp
+                              :operator (lookup "*")
+                              :args (list (first types)
+                                          (apply #'make-prodty (rest types)))))))
+
+(defclass iface ()
+  ((name :initarg :name :reader name)
+   (supers :initarg :supers :reader supers
+           :documentation "List of predicates on signature vars")
+   (signature :initarg :signature :reader signature
+              :documentation "List of vars paramterized on")
+   (impls :initarg :impls :accessor impls
+          :documentation "List of qualified predicates")))
+
+(defmethod kind ((iface iface))
+  (length (signature iface)))
+
+(defun add-impl (iface predicates &rest params)
+  (check-type iface iface)
+  (unless (= (kind iface) (length params))
+    (error "Implementation has wrong kind (~A) to implement ~A (kind ~A)"
+           (length params) iface (kind iface)))
+  (let ((pred (make-instance 'pred
+                             :iface iface
+                             :args params)))
+    (when (some (curry #'preds-overlap pred)
+                (mapcar #'head (impls iface))))
+    (push (make-instance 'tyqual
+                         :context predicates
+                         :head pred)
+          (impls iface))))
+
+(defun preds-overlap (a b)
+  (handler-case (unify a b)
+    (simple-error nil)))
+
+(defun by-super (pred)
+  (let ((subst (mapcar #'cons (signature (iface pred)) (args pred))))
+    (cons pred (mapcan #'by-super (subst-apply subst (supers (iface pred)))))))
+
+(defun by-impl (pred)
+  (some (lambda (qual)
+          (let ((subst (handler-case (match (head qual) pred)
+                         (simple-error nil))))
+            (if subst
+                (mapcar (curry #'subst-apply subst)
+                        (context qual))
+                nil)))
+        (impls (iface pred))))
+
+(defun entail (givens pred)
+  (or (some (compose (rcurry (curry #'member pred) :test #'bl-type=)
+                     #'by-super)
+            givens)
+      (every (curry #'entail givens) (by-impl pred))))
+
+(defun normal-form? (pred)
+  (labels ((test (type)
+             (etypecase type
+               (tyvar t)
+               (tycon nil)
+               (tyapp (every #'test (args type))))))
+    (every #'test (args pred))))
+
+(defun to-normal-form (pred)
+  (if (normal-form? pred)
+      (list pred)
+      (if-let (reduced (by-impl pred))
+        (list-to-normal-form reduced)
+        (error "context reduction"))))
+
+(defun list-to-normal-form (preds)
+  (mapcan #'to-normal-form preds))
+
+(defun simplify (preds)
+  (labels ((helper (results inputs)
+             (if (null inputs) results
+                 (destructuring-bind (p &rest ps) inputs
+                   (if (entail (append results ps) p)
+                       (helper results ps)
+                       (helper (cons p results) ps))))))
+    (helper nil preds)))
+
+(defun sc-entail (givens pred)
+  (some (compose (rcurry (curry #'member pred) :test #'bl-type=)
+                 #'by-super)
+        givens))
+
+(defun reduce-context (preds)
+  (simplify (list-to-normal-form preds)))
+
+(defclass scheme ()
+  ((vars :initarg :vars :reader vars
+         :documentation "tygen instances")
+   (inner-type :initarg :inner-type :reader inner-type
+               :documentation "Qualified type which may contain tygens"))
+  (:documentation "forall"))
+
+(defmethod print-object ((scheme scheme) stream)
+  (print-unreadable-object (scheme stream :type t)
+    (format stream "(~{~A~^ ~}) ~A"
+            (vars scheme) (inner-type scheme))))
+
+(defmethod subst-apply (subst (scheme scheme))
+  (make-instance 'scheme
+                 :vars (subst-apply subst (vars scheme))
+                 :inner-type (subst-apply subst (inner-type scheme))))
+
+(defmethod free-vars ((scheme scheme))
+  (free-vars (inner-type scheme)))
+
+(defun subst-code (substitution tree)
+  (cond
+    ((consp tree)
+     (cons (subst-code substitution (car tree))
+           (subst-code substitution (cdr tree))))
+    ((typep tree 'bl-type)
+     (subst-apply substitution tree))
+    (t tree)))
+
+(defun quantify (tyvars preds type)
+  (let* ((vars (remove-if-not (rcurry #'member (free-vars type)
+                                      :test #'bl-type=)
+                              tyvars))
+         (gens (loop :for var :in vars
+                     :for i :from 0
+                     :collect (make-instance 'tygen
+                                             :number i
+                                             :kind (kind var))))
+         (subst (mapcar #'cons vars gens)))
+    (values (make-instance 'scheme
+                           :vars gens
+                           :inner-type
+                           (make-instance 'tyqual
+                                          :context (subst-apply subst preds)
+                                          :head (subst-apply subst type)))
+            subst)))
+
+(defun quantify-form (tyvars preds form)
+  (multiple-value-bind (type subst) (quantify tyvars preds (form-type form))
+   (make-form type
+              (subst-code subst (form-code form)))))
+
+(defun to-scheme (monotype)
+  (make-instance 'scheme :vars nil :inner-type
+                 (make-instance 'tyqual :context nil :head monotype)))
+
+(defgeneric instantiate (types gentype)
+  (:documentation "Instantiate a type containg tygens")
+  (:method (types gentype)
+    "Default case is passthrough"
+    (declare (ignore types))
+    gentype)
+  (:method (types (gentype list))
+    (mapcar (curry #'instantiate types) gentype)))
+
+(defmethod instantiate (types (gentype tygen))
+  (nth (number gentype) types))
+
+(defmethod instantiate (types (gentype tyapp))
+  (make-instance 'tyapp
+                 :operator (instantiate types (operator gentype))
+                 :args (instantiate types (args gentype))))
+
+(defmethod instantiate (types (gentype tyqual))
+  (make-instance 'tyqual
+                 :context (instantiate types (context gentype))
+                 :head (instantiate types (head gentype))))
+
+(defmethod instantiate (types (gentype pred))
+  (make-instance 'pred
+                 :iface (iface gentype)
+                 :args (instantiate types (args gentype))))
+
+(defun fresh-instance (scheme)
+  (instantiate (mapcar (lambda (v)
+                         (make-instance 'tyvar :kind (kind v)))
+                       (vars scheme))
+               (inner-type scheme)))

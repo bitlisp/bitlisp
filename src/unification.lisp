@@ -1,55 +1,93 @@
 (in-package #:bitlisp)
 
-(defclass protocol-constraint ()
-  ((protocol :initarg :protocol :accessor protocol)
-   (args :initarg :args :accessor args)))
+(defgeneric unify (a b)
+  (:documentation "Find the most general unifier for two types")
+  (:method (a b)
+    (declare (ignore a b))
+    (error "structural mismatch")))
 
-;;; Substitutions are alists of the form ((var1 . value1) (var2 . value2))
-(defun make-subst (var value)
-  "Create a substitution consisting of a single replacement of the form var |-> value"
-  (list (cons var value)))
+(defmethod unify :around (a b)
+  (handler-case (call-next-method)
+    (simple-error (e) (error "Unable to unify ~A with ~A: ~A" a b e))))
 
-(defun subst-compose (sigma gamma)
-  "Compose two substitutions (see TAPL 22.1.1)"
-  (nconc (loop :for (var . value) :in gamma
-               :nconc (make-subst var (subst-apply sigma value)))
-         (remove-if (lambda (x) (find x gamma :key #'car))
-                    sigma)))
+(defmethod unify ((a list) (b list))
+  (let ((subst (unify (first a) (first b))))
+    (subst-compose (unify (subst-apply subst (rest a))
+                          (subst-apply subst (rest b)))
+                   subst)))
 
-;;; Returns list of substitutions and quantifiers.
-;;; TODO: Protocols
-(defun unify (constraints)
-  (when constraints
-    (destructuring-bind ((left . right) &rest rest) constraints
-      (cond
-        ((bl-type= left right)
-         ;; Ignore interchangable types
-         (unify rest))
-        ((and (typevar? left)
-              (not (find left (free-vars right))))
-         (let ((subst (make-subst left right)))
-           (subst-compose (unify (subst-constraints subst rest))
-                          subst)))
-        ((and (typevar? right)
-              (not (find right (free-vars left))))
-         (let ((subst (make-subst right left)))
-           (subst-compose (unify (subst-constraints subst rest))
-                          subst)))
-        ((and (typep left 'constructed-type)
-              (typep right 'constructed-type)
-              (= (length (args left))
-                 (length (args right))))
-         (unify (nconc (list (cons (constructor left) (constructor right)))
-                       (mapcar #'cons (args left) (args right))
-                       rest)))
-        (t (error "Couldn't unify ~A with ~A" left right))))))
+(defmethod unify ((a tyapp) (b tyapp))
+  (loop :with subst := nil
+        :for ta :in (cons (operator a) (args a))
+        :for tb :in (cons (operator b) (args b))
+        :do (setf subst (subst-compose (unify (subst-apply subst ta)
+                                              (subst-apply subst tb))
+                                       subst))
+        :finally (return subst)))
 
-(defun unif-apply (unifier form)
-  (destructuring-bind (type . code) form
-    (if (listp code)
-        (destructuring-bind (op &rest args) code
-          (etypecase op
-            (special-op (apply (special-op-subst op) unifier type args))
-            (form (make-form (subst-apply unifier type)
-                             (mapcar (curry #'unif-apply unifier) code)))))
-        (make-form (subst-apply unifier type) code))))
+(defmethod unify ((a tyvar) b)
+  (cond ((bl-type= a b) nil)
+        ((member a (free-vars b)) (error "occurs check fails"))
+        ((/= (kind a) (kind b)) (error "kind mismatch: ~A ≠ ~A"
+                                       (kind a) (kind b)))
+        (t (make-subst a b))))
+
+(defmethod unify (a (b tyvar))
+  (unify b a))
+
+(defmethod unify ((a tycon) (b tycon))
+  (if (bl-type= a b)
+      nil
+      (error "constructor mismatch")))
+
+(defmethod unify ((a pred) (b pred))
+  (if (eq (iface a) (iface b))
+      (unify (args a) (args b))
+      (error "interface mismatch: ~A ≠ ~A" (iface a) (iface b))))
+
+(defmethod unify ((a integer) (b integer))
+  (if (= a b)
+      nil
+      (error "unequal")))
+
+
+(defun subst-merge (sa sb)
+  (if (every (lambda (v) (bl-type= (subst-apply sa v)
+                                   (subst-apply sb v)))
+             (intersection (mapcar #'car sa)
+                           (mapcar #'car sb)))
+      (append sa sb)
+      (error "merge fails")))
+
+
+(defgeneric match (a b)
+  (:documentation "Given two types t1 and t2, the goal of matching is to find a substitution s such that (bl-type= t2 (subst-apply s t1)).")
+  (:method (a b)
+    (declare (ignore a b))
+    (error "fell through all cases")))
+
+(defmethod match :around (a b)
+  (handler-case (call-next-method)
+    (simple-error (e) (error "Unable to match ~A with ~A: ~A" a b e))))
+
+(defmethod match ((a list) (b list))
+  (reduce #'subst-merge (mapcar #'match a b)))
+
+(defmethod match ((a tyapp) (b tyapp))
+  (reduce #'subst-merge (cons (match (operator a) (operator b))
+                              (mapcar #'match (args a) (args b)))))
+
+(defmethod match ((a tyvar) b)
+  (if (= (kind a) (kind b))
+      (make-subst a b)
+      (error "kind mismatch: ~A ≠ ~A" (kind a) (kind b))))
+
+(defmethod match ((a tycon) (b tycon))
+  (if (bl-type= a b)
+      nil
+      (error "constructor mismatch")))
+
+(defmethod match ((a pred) (b pred))
+  (if (eq (iface a) (iface b))
+      (match (args a) (args b))
+      (error "interface mismatch: ~A ≠ ~A" (iface a) (iface b))))
