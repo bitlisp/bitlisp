@@ -53,20 +53,14 @@
     (env
       (list self (resolve env condition)
             (resolve env then) (resolve env else)))
-    ((multiple-value-bind (cform ccons cpreds) (constrain condition)
-       (multiple-value-bind (tform tcons tpreds) (constrain then)
-         (multiple-value-bind (eform econs epreds) (constrain else)
+    ((multiple-value-bind (cform cpreds csubst) (infer-expr condition)
+       (multiple-value-bind (tform tpreds tsubst) (infer-expr then)
+         (multiple-value-bind (eform epreds esubst) (infer-expr else)
            (values (make-form (form-type tform) (list self cform tform eform))
-                   (nconc (list (cons (form-type tform)
-                                      (form-type eform)))
-                          ccons tcons econs)
-                   (nconc cpreds tpreds epreds))))))
-    (unifier type
-      (make-form (subst-apply unifier type)
-                 (list self
-                       (unif-apply unifier condition)
-                       (unif-apply unifier then)
-                       (unif-apply unifier else))))
+                   (nconc cpreds tpreds epreds)
+                   (subst-compose
+                    (subst-compose (subst-compose csubst tsubst) esubst)
+                    (unify (form-type tform) (lookup "Bool"))))))))
     (module builder type
       (let* ((cond-result (codegen module builder condition))
              (func (llvm:basic-block-parent (llvm:insertion-block builder)))
@@ -126,19 +120,15 @@
                                    exports)))
           (values (list* self name import-modules exports)
                   module))))
-    (vargen
-      (declare (ignore vargen))
-      (make-form (lookup "Unit") (list* self name imports exports)))
-    (unifier utype
-      (declare (ignore unifier))
-      (make-form utype (list* self name imports exports)))
+    ((declare (ignore name imports exports))
+      nil)
     (lmodule builder type
       (declare (ignore builder name exports type))
       (dolist (import imports)
         (dolist (export (exports import))
           (let ((remote-binding (lookup export (env import))))
             (when (and (typep remote-binding 'var)
-                       (not (typep (var-type remote-binding) 'universal-type)))
+                       (null (vars (var-type remote-binding))))
               (let ((val (if (ftype? (var-type remote-binding))
                              (prog1-let (func (llvm:add-function
                                                lmodule
@@ -174,12 +164,8 @@
                                                           typed-args)))))
         (bind env name var)
         (list* self var rtype typed-args)))
-    (vargen
-     (declare (ignore vargen))
-     (make-form (lookup "Unit") (list* self name return-type args)))
-    (unifier utype
-             (declare (ignore unifier))
-             (make-form utype (list* self name return-type args)))
+    ((declare (ignore name return-type args))
+      nil)
     (module builder ctype
             (declare (ignore builder ctype return-type args))
             (let* ((cfunc (llvm:add-function module (name (name name)) (llvm (var-type name))))
