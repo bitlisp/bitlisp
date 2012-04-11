@@ -74,7 +74,7 @@
                                                   '(0 0)))))
       (integer (llvm:const-int (llvm type) code))
       (real (llvm:const-real (llvm type) code))
-      (var (if (length (vars type))
+      (var (if (vars (var-type code))
                ;; TODO: Cache polymorphic instantiations
                (funcall (llvm code) llvm-module type)
                (llvm code)))
@@ -82,7 +82,7 @@
        (destructuring-bind (op &rest args) code
          (etypecase op
            (special-op (apply (special-op-codegen op)
-                              llvm-module builder type args))
+                              llvm-module builder type (print args)))
            (form (let ((argvals (mapcar (curry #'codegen llvm-module builder)
                                         args)))
                    (prog1-let (call (llvm:build-call builder (codegen llvm-module builder op)

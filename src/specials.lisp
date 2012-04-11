@@ -97,15 +97,16 @@
         (let* ((final-subst (subst-compose
                              vsubst
                              (unify (head (fresh-instance (var-type name)))
-                                                  (form-type vform))))
+                                    (form-type vform))))
                (vty (subst-apply final-subst (form-type vform))))
           ;; TODO: Propogate quantification substitution to form body
+          (setf (var-type name) (subst-apply final-subst (var-type name)))
           (values (quantify-form (free-vars vty) vpreds (make-form vty (list self name (subst-code final-subst vform))))
                   nil))))
     (module builder type
       ;; TODO: Non-function values
       ;; TODO: Auto-create pointer specialization
-      (unless (length (vars type))
+      (unless (vars type)
         (let ((llvm-value (codegen module builder value)))
           (setf (llvm:value-name llvm-value) (var-fqn name)
                 (llvm:linkage llvm-value) :internal

@@ -9,10 +9,11 @@
    (object :initarg :object :initform nil :reader object)))
 
 (defun module-fqn (module)
-  (if (null (name module))              ;Identifies root module
-      ""
-      (concatenate 'string (module-fqn (parent module))
-                   ":" (name (name module)))))
+  (cond
+    ((null module) ":core")             ;Necessary for primitives
+    ((null (name module)) "")           ;Identifies root module
+    (t (concatenate 'string (module-fqn (parent module))
+                    ":" (name (name module))))))
 
 (defun symbol-fqn (module symbol)
   (concatenate 'string (module-fqn module) ":" (name symbol)))

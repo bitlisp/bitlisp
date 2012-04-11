@@ -25,7 +25,7 @@
                         ((prodtype? arg-type)
                          (mapcar #'llvm (flatten-product arg-type)))
                         ((eq arg-type (lookup "Unit")) nil)
-                        (t (llvm arg-type)))))
+                        (t (list (llvm arg-type))))))
 (defctor "Ptr" (inner-type)
   (llvm:pointer-type (llvm inner-type)))
 (defctor "Vector" (inner-type count)
@@ -144,7 +144,7 @@
               :name ,sym
               :llvm
               (lambda (,module ,inst-type)
-                (prog1-let (,func (llvm:add-function ,module (concatenate 'string ":core:" ,name "!" (princ-to-string ,type)) (llvm ,inst-type)))
+                (prog1-let (,func (llvm:add-function ,module (concatenate 'string (module-fqn nil) ":" ,name "!" (princ-to-string ,type)) (llvm ,inst-type)))
                   (llvm:with-object (,builder builder)
                     (llvm:position-builder-at-end ,builder (llvm:append-basic-block ,func "entry"))
                     (destructuring-bind ,(mapcar #'first args) (llvm:params ,func)
