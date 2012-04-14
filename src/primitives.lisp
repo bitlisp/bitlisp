@@ -138,7 +138,7 @@
                          :head 
                          (tyapply (lookup "func" :type)
                                   (apply #'make-prodty (mapcar (rcurry #'type-eval ,subenv) (list ,@(mapcar #'second args))))
-                                  ,return-type)))))))
+                                  (type-eval ,return-type ,subenv))))))))
        (bind *primitives-env* :value ,sym
              (make-instance
               'prim-poly-var
