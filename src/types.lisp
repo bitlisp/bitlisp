@@ -75,7 +75,7 @@
    (llvm :initarg :llvm :reader llvm)))
 
 (defmethod print-object ((ty tycon) stream)
-  (print-unreadable-object (ty stream)
+  (print-unreadable-object (ty stream :type t)
     (princ (name ty) stream)))
 
 (defmethod bl-type= ((a tycon) (b tycon))
