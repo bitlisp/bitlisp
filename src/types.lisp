@@ -87,7 +87,7 @@
 
 (defmethod print-object ((ty tyapp) stream)
   (print-unreadable-object (ty stream :type t)
-    (format stream "~A~{ ~A~}" (name (operator ty)) (args ty))))
+    (format stream "~A~{ ~S~}" (name (operator ty)) (args ty))))
 
 (defmethod kind ((type tyapp))
   (- (kind (operator type)) (length (args type))))
