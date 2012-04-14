@@ -51,8 +51,8 @@
 
 (defspecial "if" self (condition then else)
     (env
-      (list self (resolve env condition)
-            (resolve env then) (resolve env else)))
+      (list self (resolve condition env)
+            (resolve then env) (resolve else env)))
     ((multiple-value-bind (cform cpreds csubst) (infer-expr condition)
        (multiple-value-bind (tform tpreds tsubst) (infer-expr then)
          (multiple-value-bind (eform epreds esubst) (infer-expr else)
@@ -90,7 +90,7 @@
     (env
       (let ((var (make-instance 'var :name name :env env)))
         (bind env name var)
-        (list self var (resolve env value))))
+        (list self var (resolve value env))))
     ((setf (var-type name) (to-scheme (make-instance 'tyvar :kind 1)))
       (multiple-value-bind (vform vpreds vsubst)
           (infer-expr value)
@@ -143,7 +143,7 @@
                       (llvm remote-binding) val))))))))
 
 (defspecial "the" self (type value)
-    (env (list self (type-eval type env) (resolve env value)))
+    (env (list self (type-eval type env) (resolve value env)))
     ((multiple-value-bind (form preds subst) (infer-expr value)
        (values form preds
                (subst-compose subst (unify (form-type form) type)))))

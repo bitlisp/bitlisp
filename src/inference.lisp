@@ -58,7 +58,7 @@
     (t (infer-literal expr))))
 
 (defun infer-source (source)
-  (infer-expr (resolve *primitives-env* source)))
+  (infer-expr (resolve source)))
 
 (defun split-preds (fixed-vars quant-vars preds)
   "(values deferred retained)"

@@ -42,7 +42,7 @@
 (defun unbind (env symbol)
   (remhash symbol (bindings env)))
 
-(defun resolve (env source)
+(defun resolve (source &optional (env *primitives-env*))
   "Lower code into internal representations"
   (etypecase source
     (null nil)
@@ -53,9 +53,9 @@
 	   (error "~A names no binding" source))))
     (list
      (destructuring-bind (operator &rest args) source
-       (let ((op (resolve env operator)))
+       (let ((op (resolve operator env)))
 	 (typecase op
 	   ;(macro (error "TODO: Macroexpansion"))
 	   (special-op (apply (special-op-resolver op) env args))
-	   (t (cons op (mapcar (curry #'resolve env) args)))))))
+	   (t (cons op (mapcar (rcurry #'resolve env) args)))))))
     ((or string integer single-float double-float) source)))
