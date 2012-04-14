@@ -41,18 +41,18 @@
     (multiple-value-bind (argforms preds subst) (infer-expr-seq args)
       (values (make-form (second (args (form-type funcform)))
                          (cons funcform argforms))
-             (apply #'nconc fpreds preds)
-             (subst-compose (unify (apply #'make-prodty
-                                          (mapcar #'form-type argforms))
-                                   (first (args (form-type funcform))))
-                            (subst-compose subst fsubst))))))
+              (nconc fpreds preds)
+              (subst-compose (unify (apply #'make-prodty
+                                           (mapcar #'form-type argforms))
+                                    (first (args (form-type funcform))))
+                             (subst-compose subst fsubst))))))
 
 (defun infer-expr (expr)
   "(values form preds subst)"
   (typecase expr
     (var (let ((qualty (fresh-instance (var-type expr))))
            (values (make-form (head qualty) expr)
-                   (context qualty)
+                   (copy-list (context qualty))
                    nil)))
     (list (destructuring-bind (operator &rest args) expr
             (typecase operator
