@@ -141,28 +141,28 @@
   (make-instance 'tyqual :context context :head head))
 
 (defclass pred ()
-  ((iface :initarg :iface :reader iface)
+  ((interface :initarg :interface :reader interface)
    (args :initarg :args :reader args)))
 
 (defmethod print-object ((p pred) stream)
   (print-unreadable-object (p stream)
-    (format stream "~A~{ ~A~}" (iface p) (args p))))
+    (format stream "~A~{ ~A~}" (interface p) (args p))))
 
 (defmethod subst-apply (s (pred pred))
   (make-instance 'pred
-                 :iface (iface pred)
+                 :interface (interface pred)
                  :args (subst-apply s (args pred))))
 
 (defmethod free-vars ((pred pred))
   (free-vars (args pred)))
 
 (defmethod bl-type= ((a pred) (b pred))
-  (and (eq (iface a) (iface b))
+  (and (eq (interface a) (interface b))
        (every #'bl-type= (args a) (args b))))
 
-(defun make-pred (iface &rest args)
+(defun make-pred (interface &rest args)
   (make-instance 'pred
-                 :iface iface
+                 :interface interface
                  :args args))
 
 
@@ -182,9 +182,9 @@
             (apply #'tyapply constructor args)))))
 
 (defun constraint-eval (code &optional (env *primitives-env*))
-  (destructuring-bind (iface &rest args) code
+  (destructuring-bind (interface &rest args) code
     (make-instance 'pred
-                   :iface (lookup iface env)
+                   :interface (lookup interface env)
                    :args (mapcar (rcurry #'type-eval env) args))))
 
 (defun make-ftype (arg-type return-type)
@@ -199,40 +199,41 @@
                               :args (list (first types)
                                           (apply #'make-prodty (rest types)))))))
 
-(defclass iface ()
+(defclass interface ()
   ((name :initarg :name :reader name)
    (supers :initarg :supers :reader supers
            :documentation "List of predicates on signature vars")
-   (signature :initarg :signature :reader signature
-              :documentation "List of vars paramterized on")
-   (impls :initarg :impls :accessor impls
-          :documentation "List of qualified predicates")))
+   (vars :initarg :vars :reader vars
+         :documentation "List of vars paramterized on")
+   (implementations :initarg :implementations :accessor implementations
+                    :initform nil
+                    :documentation "List of qualified predicates")))
 
-(defmethod kind ((iface iface))
-  (length (signature iface)))
+(defmethod kind ((interface interface))
+  (length (vars interface)))
 
-(defun add-impl (iface predicates &rest params)
-  (check-type iface iface)
-  (unless (= (kind iface) (length params))
+(defun add-impl (interface predicates &rest params)
+  (check-type interface interface)
+  (unless (= (kind interface) (length params))
     (error "Implementation has wrong kind (~A) to implement ~A (kind ~A)"
-           (length params) iface (kind iface)))
+           (length params) interface (kind interface)))
   (let ((pred (make-instance 'pred
-                             :iface iface
+                             :interface interface
                              :args params)))
     (when (some (curry #'preds-overlap pred)
-                (mapcar #'head (impls iface))))
+                (mapcar #'head (implementations interface))))
     (push (make-instance 'tyqual
                          :context predicates
                          :head pred)
-          (impls iface))))
+          (implementations interface))))
 
 (defun preds-overlap (a b)
   (handler-case (unify a b)
     (simple-error nil)))
 
 (defun by-super (pred)
-  (let ((subst (mapcar #'cons (signature (iface pred)) (args pred))))
-    (cons pred (mapcan #'by-super (subst-apply subst (supers (iface pred)))))))
+  (let ((subst (mapcar #'cons (vars (interface pred)) (args pred))))
+    (cons pred (mapcan #'by-super (subst-apply subst (supers (interface pred)))))))
 
 (defun by-impl (pred)
   (some (lambda (qual)
@@ -242,7 +243,7 @@
                 (mapcar (curry #'subst-apply subst)
                         (context qual))
                 nil)))
-        (impls (iface pred))))
+        (implementations (interface pred))))
 
 (defun entail (givens pred)
   (or (some (compose (rcurry (curry #'member pred) :test #'bl-type=)
@@ -365,7 +366,7 @@
 
 (defmethod instantiate (types (gentype pred))
   (make-instance 'pred
-                 :iface (iface gentype)
+                 :interface (interface gentype)
                  :args (instantiate types (args gentype))))
 
 (defun fresh-instance (scheme)

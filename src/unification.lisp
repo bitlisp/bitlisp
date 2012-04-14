@@ -41,9 +41,9 @@
       (error "constructor mismatch")))
 
 (defmethod unify ((a pred) (b pred))
-  (if (eq (iface a) (iface b))
+  (if (eq (interface a) (interface b))
       (unify (args a) (args b))
-      (error "interface mismatch: ~A ≠ ~A" (iface a) (iface b))))
+      (error "interface mismatch: ~A ≠ ~A" (interface a) (interface b))))
 
 (defmethod unify ((a integer) (b integer))
   (if (= a b)
@@ -88,6 +88,6 @@
       (error "constructor mismatch")))
 
 (defmethod match ((a pred) (b pred))
-  (if (eq (iface a) (iface b))
+  (if (eq (interface a) (interface b))
       (match (args a) (args b))
-      (error "interface mismatch: ~A ≠ ~A" (iface a) (iface b))))
+      (error "interface mismatch: ~A ≠ ~A" (interface a) (interface b))))
