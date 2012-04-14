@@ -180,7 +180,7 @@
 (defun type-resolve (code &optional (env *primitives-env*))
   (etypecase code
     (integer code)
-    ((or bl-symbol string) (lookup code env))
+    ((or bl-symbol string) (lookup code :type env))
     (list (mapcar (rcurry #'type-resolve env) code))))
 
 (defun type-construct (resolved &optional (env *primitives-env*))
@@ -196,18 +196,18 @@
 (defun constraint-eval (code &optional (env *primitives-env*))
   (destructuring-bind (interface &rest args) code
     (make-instance 'pred
-                   :interface (lookup interface env)
+                   :interface (lookup interface :interface env)
                    :args (mapcar (rcurry #'type-eval env) args))))
 
 (defun make-ftype (arg-type return-type)
-  (tyapply (lookup "Func") arg-type return-type))
+  (tyapply (lookup "func" :type) arg-type return-type))
 
 (defun make-prodty (&rest types)
   (case (length types)
-    (0 (lookup "Unit"))
+    (0 (lookup "unit" :type))
     (1 (first types))
     (otherwise (make-instance 'tyapp
-                              :operator (lookup "*")
+                              :operator (lookup "*" :type)
                               :args (list (first types)
                                           (apply #'make-prodty (rest types)))))))
 

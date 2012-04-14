@@ -3,41 +3,41 @@
 (defmacro defctor (name (&rest args) &body builder)
   (with-gensyms (sym)
    `(let ((,sym (make-bl-symbol ,name)))
-      (bind *primitives-env* ,sym
+      (bind *primitives-env* :type ,sym
             (make-instance 'tycon
                            :name ,sym
                            :kind ,(1+ (length args))
                            :llvm (lambda ,args ,@builder))))))
 
-(defctor "Unit"   () (llvm:void-type))
+(defctor "unit"   () (llvm:void-type))
 (defctor "Bool"   () (llvm:int1-type))
-(defctor "Float"  () (llvm:float-type))
-(defctor "Double" () (llvm:double-type))
-(defctor "Int" (bits)
+(defctor "float"  () (llvm:float-type))
+(defctor "double" () (llvm:double-type))
+(defctor "int" (bits)
   (check-type bits integer)
   (llvm:int-type bits))
-(defctor "UInt" (bits)
+(defctor "uint" (bits)
   (check-type bits integer)
   (llvm:int-type bits))
-(defctor "Func" (arg-type return-type)
+(defctor "func" (arg-type return-type)
   (llvm:function-type (llvm return-type)
                       (cond
                         ((prodtype? arg-type)
                          (mapcar #'llvm (flatten-product arg-type)))
-                        ((eq arg-type (lookup "Unit")) nil)
+                        ((eq arg-type (lookup "unit" :type)) nil)
                         (t (list (llvm arg-type))))))
-(defctor "Ptr" (inner-type)
+(defctor "ptr" (inner-type)
   (llvm:pointer-type (llvm inner-type)))
-(defctor "Vector" (inner-type count)
+(defctor "vector" (inner-type count)
   (check-type count integer)
-  (assert (or (eq inner-type (lookup "Bool"))
+  (assert (or (eq inner-type (lookup "Bool" :type))
               (and (typep inner-type 'tyapp)
                    (member (operator inner-type)
-                           (list (lookup "Int")
-                                 (lookup "UInt")
-                                 (lookup "Ptr")
-                                 (lookup "Float")
-                                 (lookup "Double")))))
+                           (list (lookup "int" :type)
+                                 (lookup "uint" :type)
+                                 (lookup "ptr" :type)
+                                 (lookup "float" :type)
+                                 (lookup "double" :type)))))
           (inner-type)
           "Constructing vectors of type ~A is unsupported" inner-type)
   (llvm:vector-type (llvm inner-type) count))
@@ -48,13 +48,13 @@
 
 (defun ftype? (type)
   (or (and (typep type 'tyapp)
-           (eq (lookup "Func") (operator type)))
+           (eq (lookup "func" :type) (operator type)))
       (and (typep type 'scheme)
            (ftype? (inner-type type)))))
 
 (defun prodtype? (type)
   (or (and (typep type 'tyapp)
-           (eq (lookup "*") (operator type)))
+           (eq (lookup "*" :type) (operator type)))
       (and (typep type 'scheme)
            (prodtype? (inner-type type)))))
 
@@ -65,20 +65,20 @@
       (list product)))
 
 (defmacro defint (name width signed)
+  ;; TODO: Don't just alias.
   (with-gensyms (sym)
     `(let ((,sym (make-bl-symbol ,name)))
-       (bind *primitives-env* ,sym
-             (make-instance 'tyapp
-                            :operator ,(if signed
-                                           '(lookup "Int")
-                                           '(lookup "UInt"))
-                            :args '(,width))))))
+       (bind *primitives-env* :type ,sym
+             (tyapply ,(if signed
+                           '(lookup "int" :type)
+                           '(lookup "uint" :type))
+                      ,width)))))
 ;;; TODO: Architecture portability for word type
-(defint "Word"      32 t)
-(defint "UWord"     32 nil)
-(defint "Byte"      8  t)
-(defint "UByte"     8  nil)
-(defint "Codepoint" 32 nil)
+(defint "word"      32 t)
+(defint "uword"     32 nil)
+(defint "byte"      8  t)
+(defint "ubyte"     8  nil)
+(defint "codepoint" 32 nil)
 
 (defparameter *primfun-builders* nil)
 
@@ -111,7 +111,7 @@
                                  (llvm:params ,func)
                                ,@llvm)))))
             *primfun-builders*)
-      (bind *primitives-env* ,symbol ,var))))
+      (bind *primitives-env* :value ,symbol ,var))))
 
 (defmacro defprimpoly (name vars return-type args (builder) &body instantiator)
   (with-gensyms (module sym type qvars subenv func inst-type)
@@ -124,7 +124,10 @@
                                              :kind 1))
                             ',vars))
             (,type (let ((,subenv (make-subenv *primitives-env*)))
-                     (destructuring-bind ,vars ,qvars
+                     (loop :for name :in ',(mapcar #'string vars)
+                           :for qvar :in ,qvars
+                           :do (bind ,subenv :type name qvar))
+                     (destructuring-bind ,vars ',(mapcar #'string vars)
                        (make-instance
                         'scheme
                         :vars ,qvars
@@ -133,10 +136,10 @@
                          'tyqual
                          :context nil
                          :head
-                         (type-eval (list "Func" (make-prodty ,@(mapcar #'second args))
+                         (type-eval (list "func" (list "*" ,@(mapcar #'second args))
                                           ,return-type)
                                     ,subenv)))))))
-       (bind *primitives-env* ,sym
+       (bind *primitives-env* :value ,sym
              (make-instance
               'prim-poly-var
               :var-type ,type
@@ -150,34 +153,34 @@
                     (destructuring-bind ,(mapcar #'first args) (llvm:params ,func)
                       ,@instantiator)))))))))
 
-(defprimpoly "int+" (a) `("Int" ,a) ((x `("Int" ,a)) (y `("Int" ,a))) (builder)
+(defprimpoly "int+" (a) `("int" ,a) ((x `("int" ,a)) (y `("int" ,a))) (builder)
   (llvm:build-ret (llvm:build-add builder x y "sum")))
 
-(defprimpoly "int-" (a) `("Int" ,a) ((x `("Int" ,a)) (y `("Int" ,a))) (builder)
+(defprimpoly "int-" (a) `("int" ,a) ((x `("int" ,a)) (y `("int" ,a))) (builder)
   (llvm:build-ret (llvm:build-sub builder x y "difference")))
 
-(defprimpoly "int*" (a) `("Int" ,a) ((x `("Int" ,a)) (y `("Int" ,a))) (builder)
+(defprimpoly "int*" (a) `("int" ,a) ((x `("int" ,a)) (y `("int" ,a))) (builder)
   (llvm:build-ret (llvm:build-mul builder x y "product")))
 
-(defprimpoly "int/" (a) `("Int" ,a) ((x `("Int" ,a)) (y `("Int" ,a))) (builder)
+(defprimpoly "int/" (a) `("int" ,a) ((x `("int" ,a)) (y `("int" ,a))) (builder)
   (llvm:build-ret (llvm:build-s-div builder x y "quotient")))
 
-(defprimpoly "int-rem" (a) `("Int" ,a) ((x `("Int" ,a)) (y `("Int" ,a))) (builder)
+(defprimpoly "int-rem" (a) `("int" ,a) ((x `("int" ,a)) (y `("int" ,a))) (builder)
   (llvm:build-ret (llvm:build-s-rem builder x y "remainder")))
 
-(defprimpoly "uint+" (a) `("UInt" ,a) ((x `("UInt" ,a)) (y `("UInt" ,a))) (builder)
+(defprimpoly "uint+" (a) `("uint" ,a) ((x `("uint" ,a)) (y `("uint" ,a))) (builder)
   (llvm:build-ret (llvm:build-add builder x y "sum")))
 
-(defprimpoly "uint-" (a) `("UInt" ,a) ((x `("UInt" ,a)) (y `("UInt" ,a))) (builder)
+(defprimpoly "uint-" (a) `("uint" ,a) ((x `("uint" ,a)) (y `("uint" ,a))) (builder)
   (llvm:build-ret (llvm:build-sub builder x y "difference")))
 
-(defprimpoly "uint*" (a) `("UInt" ,a) ((x `("UInt" ,a)) (y `("UInt" ,a))) (builder)
+(defprimpoly "uint*" (a) `("uint" ,a) ((x `("uint" ,a)) (y `("uint" ,a))) (builder)
   (llvm:build-ret (llvm:build-mul builder x y "product")))
 
-(defprimpoly "uint/" (a) `("UInt" ,a) ((x `("UInt" ,a)) (y `("UInt" ,a))) (builder)
+(defprimpoly "uint/" (a) `("uint" ,a) ((x `("uint" ,a)) (y `("uint" ,a))) (builder)
   (llvm:build-ret (llvm:build-u-div builder x y "quotient")))
 
-(defprimpoly "uint-rem" (a) `("UInt" ,a) ((x `("UInt" ,a)) (y `("UInt" ,a))) (builder)
+(defprimpoly "uint-rem" (a) `("uint" ,a) ((x `("uint" ,a)) (y `("uint" ,a))) (builder)
   (llvm:build-ret (llvm:build-u-rem builder x y "remainder")))
 
 (defmacro deficmps (types &rest ops)
@@ -188,10 +191,10 @@
                      (a) "Bool" ((lhs `(,,type ,a)) (rhs `(,,type ,a))) (builder)
                    (llvm:build-ret builder (llvm:build-i-cmp builder ,op lhs rhs "")))))))
 
-(deficmps ("Int" "UInt") :> :< := :/= :>= :<=)
+(deficmps ("int" "uint") :> :< := :/= :>= :<=)
 
-(defprimpoly "load" (a) a ((pointer `("Ptr" ,a))) (builder)
+(defprimpoly "load" (a) a ((pointer `("ptr" ,a))) (builder)
   (llvm:build-ret builder (llvm:build-load builder pointer "value")))
-(defprimpoly "store" (a) a ((pointer `("Ptr" ,a)) (value a)) (builder)
+(defprimpoly "store" (a) a ((pointer `("ptr" ,a)) (value a)) (builder)
   (llvm:build-store builder value pointer)
   (llvm:build-ret builder value))

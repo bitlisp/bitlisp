@@ -1,8 +1,12 @@
 (in-package #:bitlisp)
 
 (defclass environment ()
-  ((bindings :initform (make-hash-table :test 'eq)
-             :initarg :bindings :reader bindings)
+  ((value-bindings :initform (make-hash-table :test 'eq)
+                   :initarg :value-bindings :reader value-bindings)
+   (type-bindings :initform (make-hash-table :test 'eq)
+                  :initarg :type-bindings :reader type-bindings)
+   (interface-bindings :initform (make-hash-table :test 'eq)
+                       :initarg :interface-bindings :reader interface-bindings)
    (parents :initform () :initarg :parents :accessor parents)
    (module :initform nil :initarg :module :accessor module)
    (toplevel? :initarg :toplevel? :accessor toplevel?)))
@@ -16,20 +20,26 @@
 (defvar *primitives-env* (make-instance 'environment :toplevel? t)
   "Environment in which all primitive operators are bound")
 
-(defun lookup (symbol &optional (env *primitives-env*))
+(defun bindings (env &optional (namespace :value))
+  (ecase namespace
+    (:value (value-bindings env))
+    (:type (type-bindings env))
+    (:interface (interface-bindings env))))
+
+(defun lookup (symbol &optional (namespace :value) (env *primitives-env*))
   (when (stringp symbol)
     (setf symbol (make-bl-symbol symbol)))
   (if env
-      (multiple-value-bind (place exists) (gethash symbol (bindings env))
+      (multiple-value-bind (place exists) (gethash symbol (bindings env namespace))
         (if exists
             (values place t)
             (loop for parent in (parents env)
-                  do (multiple-value-bind (place exists) (lookup symbol parent)
+                  do (multiple-value-bind (place exists) (lookup symbol namespace parent)
                        (when exists
                            (return (values place t)))))))
       (values nil nil)))
 
-(defun bind (env symbol value)
+(defun bind (env namespace symbol value)
   "Associate SYMBOL with VALUE in ENV"
   (etypecase symbol
     (string (setf symbol (make-bl-symbol symbol)))
@@ -37,17 +47,17 @@
   (multiple-value-bind (old-value exists) (gethash symbol (bindings env))
     (when exists
       (warn "Rebinding ~A to ~A (was ~A) in ~A" symbol value old-value env)))
-  (setf (gethash symbol (bindings env)) value))
+  (setf (gethash symbol (bindings env namespace)) value))
 
-(defun unbind (env symbol)
-  (remhash symbol (bindings env)))
+(defun unbind (env symbol &optional (namespace :value))
+  (remhash symbol (bindings env namespace)))
 
 (defun resolve (source &optional (env *primitives-env*))
   "Lower code into internal representations"
   (etypecase source
     (null nil)
     (bl-symbol
-     (multiple-value-bind (place exists) (lookup source env)
+     (multiple-value-bind (place exists) (lookup source :value env)
        (if exists
 	   place
 	   (error "~A names no binding" source))))

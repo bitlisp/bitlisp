@@ -37,7 +37,8 @@
                                             (list (env parent)))))))
     (dolist (import imports)
       (dolist (sym (exports import))
-        (bind menv sym (lookup sym (env import)))))
+        ;; TODO: Import non-values
+        (bind menv sym (lookup sym :value (env import)))))
     (prog1-let (mod (make-instance
                      'module
                      :name name
@@ -58,6 +59,6 @@
      (maphash (lambda (sym var)
                 (declare (ignore var))
                 (push sym primitives))
-              (bindings *primitives-env*))
+              *primitives-env*)
      (make-module (make-bl-symbol "core") root nil primitives *primitives-env*)
-     (bind (env root) (make-bl-symbol "module") (lookup "module" *primitives-env*)))))
+     (bind (env root) (make-bl-symbol "module") (lookup "module")))))

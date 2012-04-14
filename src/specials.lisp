@@ -10,7 +10,7 @@
                                          ,@inferrer)
            (special-op-codegen ,self) (lambda (,module ,builder ,ctype ,@args)
                                         ,@codegen))
-     (bind *primitives-env* (make-bl-symbol ,name) ,self)))
+     (bind *primitives-env* :value (make-bl-symbol ,name) ,self)))
 
 (defspecial "lambda" self (args &rest body)
     (env
@@ -21,7 +21,7 @@
              (arg-vars (mapcar (lambda (sym)
                                  (make-instance 'var :name sym :env new-env))
                                args)))
-        (mapc (curry #'bind new-env) args arg-vars)
+        (mapc (curry #'bind new-env :value) args arg-vars)
         (list* self arg-vars
                (mapcar (rcurry #'resolve new-env) body))))
     (;; TODO: Probably shouldn't mutate here.
@@ -60,7 +60,7 @@
                    (nconc cpreds tpreds epreds)
                    (subst-compose
                     (subst-compose (subst-compose csubst tsubst) esubst)
-                    (unify (form-type tform) (lookup "Bool"))))))))
+                    (unify (form-type tform) (lookup "Bool" :type))))))))
     (module builder type
       (let* ((cond-result (codegen module builder condition))
              (func (llvm:basic-block-parent (llvm:insertion-block builder)))
@@ -89,7 +89,7 @@
 (defspecial "def" self (name value)
     (env
       (let ((var (make-instance 'var :name name :env env)))
-        (bind env name var)
+        (bind env :value name var)
         (list self var (resolve value env))))
     ((setf (var-type name) (to-scheme (make-instance 'tyvar :kind 1)))
       (multiple-value-bind (vform vpreds vsubst)
@@ -115,7 +115,7 @@
 (defspecial "module" self (name imports &rest exports)
     (env
       (assert (toplevel? env) () "Cannot change modules below the top level")
-      (let ((import-modules (mapcar (rcurry #'lookup env) imports)))
+      (let ((import-modules (mapcar (rcurry #'lookup :value env) imports)))
         (let ((module (make-module name (module env)
                                    import-modules
                                    exports)))
@@ -127,7 +127,8 @@
       (declare (ignore builder name exports type))
       (dolist (import imports)
         (dolist (export (exports import))
-          (let ((remote-binding (lookup export (env import))))
+          ;; TODO: Import non-values
+          (let ((remote-binding (lookup export :value (env import))))
             (when (and (typep remote-binding 'var)
                        (null (vars (var-type remote-binding))))
               (let ((val (if (ftype? (var-type remote-binding))
@@ -158,19 +159,19 @@
                          :for n :from 0
                          :for gen := (make-instance 'tygen
                                                     :number n)
-                         :do (bind subenv var gen)
+                         :do (bind subenv :type var gen)
                          :collect gen))
              (preds (mapcar (rcurry #'constraint-eval subenv) supers))
              (interface (make-instance 'interface
                                        :name name
                                        :vars gens
                                        :supers preds)))
-        (bind env name interface)
+        (bind env :interface name interface)
         (loop :for (name type default) :in bindings
               :for resolved := (type-resolve type subenv)
               :do (loop :for (gen . kind) :in (infer-kinds resolved)
                         :do (setf (kind gen) kind))
-                  (bind env name
+                  (bind env :value name
                         (make-instance
                          'var
                          :name name
@@ -198,18 +199,18 @@
                                  :var-type (apply #'make-ftype rtype
                                                   (mapcar #'second
                                                           typed-args)))))
-        (bind env name var)
+        (bind env :value name var)
         (list* self var rtype typed-args)))
     ((declare (ignore name return-type args))
       nil)
     (module builder ctype
-            (declare (ignore builder ctype return-type args))
-            (let* ((cfunc (llvm:add-function module (name (name name)) (llvm (var-type name))))
-                   (blfunc (llvm:add-function module (var-fqn name) (llvm (var-type name))))
-                   (entry (llvm:append-basic-block blfunc "entry")))
-              (llvm:add-function-attributes blfunc :inline-hint)
-              (setf (llvm:function-calling-convention blfunc) :fast
-                    (llvm name) blfunc)
-              (llvm:with-object (builder builder)
-                (llvm:position-builder-at-end builder entry)
-                (llvm:build-ret builder (llvm:build-call builder cfunc (llvm:params blfunc) ""))))))
+      (declare (ignore builder ctype return-type args))
+      (let* ((cfunc (llvm:add-function module (name (name name)) (llvm (var-type name))))
+             (blfunc (llvm:add-function module (var-fqn name) (llvm (var-type name))))
+             (entry (llvm:append-basic-block blfunc "entry")))
+        (llvm:add-function-attributes blfunc :inline-hint)
+        (setf (llvm:function-calling-convention blfunc) :fast
+              (llvm name) blfunc)
+        (llvm:with-object (builder builder)
+          (llvm:position-builder-at-end builder entry)
+          (llvm:build-ret builder (llvm:build-call builder cfunc (llvm:params blfunc) ""))))))

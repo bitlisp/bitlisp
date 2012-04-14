@@ -2,22 +2,25 @@
 
 (defun infer-literal (lit)
   (etypecase lit
-    (character (make-form (lookup "Codepoint") lit))
-    (string (make-form (type-eval '("Ptr" "Byte")) lit))
+    (character (make-form (lookup "codepoint" :type) lit))
+    ;; TODO: Polymorphic strings because why not?
+    (string (make-form (type-eval '("ptr" "byte")) lit))
     (integer (let ((var (make-instance 'tyvar :kind 1)))
                (values (make-form var lit)
                        (list (make-instance 'pred
-                                            :interface (if (= lit 0)
-                                                           (or (lookup "AbelianGroup")
-                                                               (error "AbelianGroup undefined"))
-                                                           (or (lookup "Ring")
-                                                               (error "Ring undefined")))
+                                            :interface
+                                            (if (= lit 0)
+                                                (or (lookup "abelian-group" :interface)
+                                                    (error "abelian-group undefined"))
+                                                (or (lookup "ring" :interface)
+                                                    (error "ring undefined")))
                                             :args (list var))))))
     (ratio (let ((var (make-instance 'tyvar :kind 1)))
              (values (make-form var lit)
                      (list (make-instance 'pred
-                                          :interface (or (lookup "DivisionRing")
-                                                         (error "DivisionRing undefined"))
+                                          :interface
+                                          (or (lookup "division-ring" :interface)
+                                              (error "division-ring undefined"))
                                           :args (list var))))))))
 
 (defun infer-expr-seq (exprs)
