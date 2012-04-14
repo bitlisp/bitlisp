@@ -173,13 +173,21 @@
                           :args (append (args operator) args)))
     (t (make-instance 'tyapp :operator operator :args args))))
 
-(defun type-eval (code &optional (env *primitives-env*))
+(defun type-resolve (code &optional (env *primitives-env*))
   (etypecase code
-    ((or integer tygen tyapp) code)
+    (integer code)
     ((or bl-symbol string) (lookup code env))
+    (list (mapcar (rcurry #'type-resolve env) code))))
+
+(defun type-construct (resolved &optional (env *primitives-env*))
+  (etypecase resolved
+    ((or integer bl-type) resolved)
     (list (destructuring-bind (constructor &rest args)
-              (mapcar (rcurry #'type-eval env) code)
+              (mapcar (rcurry #'type-construct env) resolved)
             (apply #'tyapply constructor args)))))
+
+(defun type-eval (code &optional (env *primitives-env*))
+  (type-construct (type-resolve code env) env))
 
 (defun constraint-eval (code &optional (env *primitives-env*))
   (destructuring-bind (interface &rest args) code
