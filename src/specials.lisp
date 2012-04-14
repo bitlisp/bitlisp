@@ -101,7 +101,9 @@
                (vty (subst-apply final-subst (form-type vform))))
           ;; TODO: Propogate quantification substitution to form body
           (setf (var-type name) (subst-apply final-subst (var-type name)))
-          (values (quantify-form (free-vars vty) vpreds (make-form vty (list self name (subst-code final-subst vform))))
+          (values (quantify-form (free-vars vty)
+                                 (subst-apply final-subst vpreds)
+                                 (make-form vty (list self name (subst-code final-subst vform))))
                   nil))))
     (module builder type
       ;; TODO: Non-function values
