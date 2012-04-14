@@ -59,7 +59,7 @@
 
 (defclass tygen (bl-type)
   ((number :initarg :number :reader number)
-   (kind :initarg :kind :reader kind)))
+   (kind :initarg :kind :accessor kind)))
 
 (defmethod print-object ((ty tygen) stream)
   (print-unreadable-object (ty stream :type t)
@@ -145,7 +145,7 @@
    (args :initarg :args :reader args)))
 
 (defmethod print-object ((p pred) stream)
-  (print-unreadable-object (p stream)
+  (print-unreadable-object (p stream :type t)
     (format stream "~A~{ ~A~}" (interface p) (args p))))
 
 (defmethod subst-apply (s (pred pred))
@@ -223,6 +223,10 @@
 
 (defmethod kind ((interface interface))
   (length (vars interface)))
+
+(defmethod print-object ((i interface) stream)
+  (print-unreadable-object (i stream :type t)
+    (princ (name i) stream)))
 
 (defun add-impl (interface predicates &rest params)
   (check-type interface interface)

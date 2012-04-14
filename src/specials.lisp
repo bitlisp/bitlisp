@@ -151,6 +151,41 @@
       (declare (ignore m b ty type value))
       (error "What's this doing here?")))
 
+(defspecial "interface" self (name vars supers &rest bindings)
+    (env
+      (let* ((subenv (make-subenv env))
+             (gens (loop :for var :in vars
+                         :for n :from 0
+                         :for gen := (make-instance 'tygen
+                                                    :number n)
+                         :do (bind subenv var gen)
+                         :collect gen))
+             (preds (mapcar (rcurry #'constraint-eval env) supers))
+             (interface (make-instance 'interface
+                                       :name name
+                                       :vars gens
+                                       :supers preds)))
+        (bind env name interface)
+        (loop :for (name type default) :in bindings
+              :for resolved := (type-resolve type subenv)
+              :do (loop :for (gen . kind) :in (infer-kinds resolved)
+                        :do (setf (kind gen) kind))
+                  (bind env name
+                        (make-instance
+                         'var
+                         :name name
+                         :env env
+                         :var-type
+                         (make-instance 'scheme
+                                        :vars gens
+                                        :inner-type
+                                        (qualify (list (make-pred interface gens))
+                                                 (type-construct resolved subenv))))))
+        nil))
+    ((declare (ignore name vars supers bindings)))
+    (m b ty
+      (declare (ignore name vars supers bindings m b ty))))
+
 (defspecial "cdef" self (name return-type &rest args)
     (env
       (let* ((rtype (type-eval return-type env))
