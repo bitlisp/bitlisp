@@ -167,6 +167,10 @@
 
 
 (defun tyapply (operator &rest args)
+  (assert (> (kind operator) (length args))
+          (operator)
+          "Cannot apply type of kind ~A to ~A arguments!"
+          (kind operator) (length args))
   (typecase operator
     (tyapp (make-instance 'tyapp
                           :operator (operator operator)
@@ -184,10 +188,6 @@
     ((or integer bl-type) resolved)
     (list (destructuring-bind (constructor &rest args)
               (mapcar (rcurry #'type-construct env) resolved)
-            (assert (> (kind constructor) (length args))
-                    (constructor)
-                    "Cannot apply type of kind ~A to ~A arguments!"
-                    (kind constructor) (length args))
             (apply #'tyapply constructor args)))))
 
 (defun type-eval (code &optional (env *primitives-env*))
