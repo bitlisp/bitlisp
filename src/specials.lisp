@@ -23,7 +23,7 @@
                                args)))
         (mapc (curry #'bind new-env) args arg-vars)
         (list* self arg-vars
-               (mapcar (curry #'resolve new-env) body))))
+               (mapcar (rcurry #'resolve new-env) body))))
     (;; TODO: Probably shouldn't mutate here.
      (let ((arg-types (loop :repeat (length args) :collect (make-instance 'tyvar :kind 1))))
        (mapc (lambda (var ty) (setf (var-type var) (to-scheme ty)))
@@ -160,7 +160,7 @@
                                                     :number n)
                          :do (bind subenv var gen)
                          :collect gen))
-             (preds (mapcar (rcurry #'constraint-eval env) supers))
+             (preds (mapcar (rcurry #'constraint-eval subenv) supers))
              (interface (make-instance 'interface
                                        :name name
                                        :vars gens
