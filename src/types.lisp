@@ -382,3 +382,13 @@
                          (make-instance 'tyvar :kind (kind v)))
                        (vars scheme))
                (inner-type scheme)))
+
+(defun infer-kinds (type &optional (arg-count 0))
+  "Takes a resolved type form and returns a (tyvar/tygen . kind) alist."
+  (assert (not (null type)))
+  (etypecase type
+    ((or tyvar tygen) (list (cons type (1+ arg-count))))
+    (list (apply #'nconc
+                 (infer-kinds (first type) (length (rest type)))
+                 (mapcar #'infer-kinds (rest type))))
+    ((or bl-type integer) nil)))
