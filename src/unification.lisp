@@ -6,10 +6,6 @@
     (declare (ignore a b))
     (error "structural mismatch")))
 
-(defmethod unify :around (a b)
-  (handler-case (call-next-method)
-    (simple-error (e) (error "Unable to unify ~A with ~A: ~A" a b e))))
-
 (defmethod unify ((a list) (b list))
   (let ((subst (unify (first a) (first b))))
     (subst-compose (unify (subst-apply subst (rest a))
