@@ -248,8 +248,8 @@
     (simple-error nil)))
 
 (defun by-super (pred)
-  (let ((subst (mapcar #'cons (vars (interface pred)) (args pred))))
-    (cons pred (mapcan #'by-super (subst-apply subst (supers (interface pred)))))))
+  (cons pred (mapcan (compose #'by-super (curry #'instantiate (args pred)))
+                     (supers (interface pred)))))
 
 (defun by-impl (pred)
   (some (lambda (qual)
