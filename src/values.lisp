@@ -10,6 +10,8 @@
   ((name :initarg :name :reader name)
    (env :initarg :env :reader env)
    (var-type :initarg :var-type :accessor var-type)
+   (instances :initform nil :accessor instances
+              :documentation "(bl-type . llvm) alist for cached compiled instances of polymorphic values")
    (llvm :initarg :llvm :accessor llvm)))
 
 (defclass prim-poly-var (var) ())

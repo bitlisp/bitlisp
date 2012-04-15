@@ -76,8 +76,9 @@
       (integer (llvm:const-int (llvm type) code))
       (real (llvm:const-real (llvm type) code))
       (var (if (vars (var-type code))
-               ;; TODO: Cache polymorphic instantiations
-               (funcall (llvm code) llvm-module type)
+               (or (assoc-value (instances code) type :test #'bl-type=)
+                   (setf (assoc-value (instances code) type :test #'bl-type=)
+                         (funcall (llvm code) llvm-module type)))
                (llvm code)))
       (list
        (destructuring-bind (op &rest args) code
