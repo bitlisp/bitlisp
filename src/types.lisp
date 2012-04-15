@@ -262,10 +262,14 @@
         (implementations (interface pred))))
 
 (defun entail (givens pred)
-  (or (some (compose (rcurry (curry #'member pred) :test #'bl-type=)
-                     #'by-super)
-            givens)
-      (every (curry #'entail givens) (by-impl pred))))
+  (or
+   ;; pred is in givens or their collected superclasses
+   (some (compose (rcurry (curry #'member pred) :test #'bl-type=)
+                  #'by-super)
+         givens)
+   ;; pred can be implemented using other interfaces
+   (let ((new-preds (by-impl pred)))
+     (and new-preds (every (curry #'entail givens) new-preds)))))
 
 (defun normal-form? (pred)
   (labels ((test (type)
