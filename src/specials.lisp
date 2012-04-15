@@ -182,7 +182,7 @@
                          (make-instance 'scheme
                                         :vars gens
                                         :inner-type
-                                        (qualify (list (make-pred interface gens))
+                                        (qualify (list (apply #'make-pred interface gens))
                                                  (type-construct resolved subenv))))))
         nil))
     ((declare (ignore name vars supers bindings)))
