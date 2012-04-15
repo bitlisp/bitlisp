@@ -23,9 +23,12 @@
 
 (defmethod unify ((a tyvar) b)
   (cond ((bl-type= a b) nil)
-        ((member a (free-vars b)) (error "occurs check fails"))
-        ((/= (kind a) (kind b)) (error "kind mismatch: ~A ≠ ~A"
-                                       (kind a) (kind b)))
+        ((member a (free-vars b))
+         (error "Recursion check fails: ~S occurs in ~S"
+                a b))
+        ((/= (kind a) (kind b))
+         (error "Kind mismatch: ~A ≠ ~A"
+                (kind a) (kind b)))
         (t (make-subst a b))))
 
 (defmethod unify (a (b tyvar))
@@ -34,12 +37,12 @@
 (defmethod unify ((a tycon) (b tycon))
   (if (bl-type= a b)
       nil
-      (error "constructor mismatch")))
+      (error "Constructor mismatch: ~S ≠ ~S" a b)))
 
 (defmethod unify ((a pred) (b pred))
   (if (eq (interface a) (interface b))
       (unify (args a) (args b))
-      (error "interface mismatch: ~A ≠ ~A" (interface a) (interface b))))
+      (error "Interface mismatch: ~S ≠ ~S" (interface a) (interface b))))
 
 (defmethod unify ((a integer) (b integer))
   (if (= a b)
