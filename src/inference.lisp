@@ -71,3 +71,13 @@
                  (every (rcurry #'member fixed-vars)
                         (free-vars pred)))
                reduced)))
+
+(defun infer-kinds (resolved-type &optional (arg-count 0))
+  "Takes a resolved type form and returns a (tyvar/tygen . kind) alist."
+  (assert (not (null resolved-type)))
+  (etypecase resolved-type
+    ((or tyvar tygen) (list (cons resolved-type (1+ arg-count))))
+    (list (apply #'nconc
+                 (infer-kinds (first resolved-type) (length (rest resolved-type)))
+                 (mapcar #'infer-kinds (rest resolved-type))))
+    ((or bl-type integer) nil)))
