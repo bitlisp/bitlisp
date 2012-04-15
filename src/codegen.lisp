@@ -46,10 +46,10 @@
 (defun compile-main (llvm-module internal-main)
   (let ((ftype (type-eval '("func" ("*" "word" ("ptr" ("ptr" "byte")))
                             "word"))))
-   (assert (bl-type= (var-type internal-main) ftype)
+   (assert (bl-type= (value-type internal-main) ftype)
            ()
            "main is of inappropriate type ~A (should be ~A)"
-           (var-type internal-main) ftype)
+           (value-type internal-main) ftype)
     (llvm:with-objects ((builder builder))
       (let* ((main (llvm:add-function llvm-module "main" (llvm ftype)))
              (entry (llvm:append-basic-block main "entry"))
@@ -75,10 +75,12 @@
                                                   '(0 0)))))
       (integer (llvm:const-int (llvm type) code))
       (real (llvm:const-real (llvm type) code))
-      (var (if (vars (var-type code))
+      (var (if (vars (value-type code))
                (or (assoc-value (instances code) type :test #'bl-type=)
                    (setf (assoc-value (instances code) type :test #'bl-type=)
-                         (funcall (llvm code) llvm-module type)))
+                         (if (typep code 'prim-poly-value)
+                             (funcall (llvm code) llvm-module type)
+                             (codegen-instance ))))
                (llvm code)))
       (list
        (destructuring-bind (op &rest args) code

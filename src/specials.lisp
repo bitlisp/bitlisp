@@ -19,14 +19,14 @@
                                      :toplevel? nil
                                      :module (module env)))
              (arg-vars (mapcar (lambda (sym)
-                                 (make-instance 'var :name sym :env new-env))
+                                 (make-instance 'value :name sym :env new-env))
                                args)))
         (mapc (curry #'bind new-env :value) args arg-vars)
         (list* self arg-vars
                (mapcar (rcurry #'resolve new-env) body))))
     (;; TODO: Probably shouldn't mutate here.
      (let ((arg-types (loop :repeat (length args) :collect (make-instance 'tyvar :kind 1))))
-       (mapc (lambda (var ty) (setf (var-type var) (to-scheme ty)))
+       (mapc (lambda (var ty) (setf (value-type var) (to-scheme ty)))
              args arg-types)
        (multiple-value-bind (forms preds subst) (infer-expr-seq body)
          (values (make-form (make-ftype (apply #'make-prodty arg-types)
@@ -88,19 +88,19 @@
 
 (defspecial "def" self (name value)
     (env
-      (let ((var (make-instance 'var :name name :env env)))
+      (let ((var (make-instance 'value :name name :env env)))
         (bind env :value name var)
         (list self var (resolve value env))))
-    ((setf (var-type name) (to-scheme (make-instance 'tyvar :kind 1)))
+    ((setf (value-type name) (to-scheme (make-instance 'tyvar :kind 1)))
       (multiple-value-bind (vform vpreds vsubst)
           (infer-expr value)
         (let* ((final-subst (subst-compose
                              vsubst
-                             (unify (head (fresh-instance (var-type name)))
+                             (unify (head (fresh-instance (value-type name)))
                                     (form-type vform))))
                (vty (subst-apply final-subst (form-type vform))))
           ;; TODO: Propogate quantification substitution to form body
-          (setf (var-type name) (subst-apply final-subst (var-type name)))
+          (setf (value-type name) (subst-apply final-subst (value-type name)))
           ;; TODO: Pass in free type vars collected from non-global value bindings
           (multiple-value-bind (deferred retained) (split-preds nil (free-vars vty)
                                                                 (subst-apply final-subst vpreds))
@@ -134,16 +134,16 @@
         (dolist (export (exports import))
           ;; TODO: Import non-values
           (let ((remote-binding (lookup export :value (env import))))
-            (when (and (typep remote-binding 'var)
-                       (null (vars (var-type remote-binding))))
-              (let ((val (if (ftype? (var-type remote-binding))
+            (when (and (typep remote-binding 'value)
+                       (null (vars (value-type remote-binding))))
+              (let ((val (if (ftype? (value-type remote-binding))
                              (prog1-let (func (llvm:add-function
                                                lmodule
                                                (symbol-fqn import export)
-                                               (llvm (var-type remote-binding))))
+                                               (llvm (value-type remote-binding))))
                                (setf (llvm:function-calling-convention func) :fast))
                              (llvm:add-global lmodule
-                                              (llvm (var-type remote-binding))
+                                              (llvm (value-type remote-binding))
                                               (symbol-fqn import export)))))
                 (setf (llvm:linkage val) :external
                       (llvm remote-binding) val))))))))
@@ -178,10 +178,10 @@
                         :do (setf (kind gen) kind))
                   (bind env :value name
                         (make-instance
-                         'var
+                         'value
                          :name name
                          :env env
-                         :var-type
+                         :value-type
                          (make-instance 'scheme
                                         :vars gens
                                         :inner-type
@@ -198,10 +198,10 @@
              (typed-args (mapcar (lambda (arg)
                                    (list (first arg) (type-eval (second arg) env)))
                                  args))
-             (var (make-instance 'var
+             (var (make-instance 'value
                                  :name name
                                  :env env
-                                 :var-type (apply #'make-ftype rtype
+                                 :value-type (apply #'make-ftype rtype
                                                   (mapcar #'second
                                                           typed-args)))))
         (bind env :value name var)
@@ -210,8 +210,8 @@
       nil)
     (module builder ctype
       (declare (ignore builder ctype return-type args))
-      (let* ((cfunc (llvm:add-function module (name (name name)) (llvm (var-type name))))
-             (blfunc (llvm:add-function module (var-fqn name) (llvm (var-type name))))
+      (let* ((cfunc (llvm:add-function module (name (name name)) (llvm (value-type name))))
+             (blfunc (llvm:add-function module (var-fqn name) (llvm (value-type name))))
              (entry (llvm:append-basic-block blfunc "entry")))
         (llvm:add-function-attributes blfunc :inline-hint)
         (setf (llvm:function-calling-convention blfunc) :fast

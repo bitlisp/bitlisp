@@ -88,30 +88,30 @@
         *primfun-builders*))
 
 (defmacro defprimfun (name rtype args (module builder type) &body llvm)
-  (with-gensyms (symbol func var bl-module)
-   `(let* ((,symbol (make-bl-symbol ,name))
-           (,type (make-ftype (make-prodty ,@(mapcar (compose (curry #'list 'lookup) #'second) args))
-                              (lookup ,rtype)))
-           (,var (make-instance 'var
-                                :name ,symbol
-                                :var-type ,type)))
-      (push (cons ,var (lambda (,bl-module ,module)
-                         (prog1-let (,func (llvm:add-function module
-                                                              (symbol-fqn ,bl-module
-                                                                          (make-bl-symbol ,name))
-                                                              (llvm ,type)))
-                           (setf (llvm:function-calling-convention ,func) :fast)
-                           (mapc #'(setf llvm:value-name)
-                                 ',(mapcar (compose #'string-downcase #'first) args)
-                                 (llvm:params ,func))
-                           (llvm:with-object (,builder builder)
-                             (llvm:position-builder-at-end builder
-                                                           (llvm:append-basic-block ,func "entry"))
-                             (destructuring-bind ,(mapcar #'first args)
-                                 (llvm:params ,func)
-                               ,@llvm)))))
-            *primfun-builders*)
-      (bind *primitives-env* :value ,symbol ,var))))
+  (with-gensyms (symbol func value bl-module)
+    `(let* ((,symbol (make-bl-symbol ,name))
+            (,type (make-ftype (make-prodty ,@(mapcar (compose (curry #'list 'lookup) #'second) args))
+                               (lookup ,rtype)))
+            (,value (make-instance 'value
+                                   :name ,symbol
+                                   :value-type ,type)))
+       (push (cons ,value (lambda (,bl-module ,module)
+                            (prog1-let (,func (llvm:add-function module
+                                                                 (symbol-fqn ,bl-module
+                                                                             (make-bl-symbol ,name))
+                                                                 (llvm ,type)))
+                              (setf (llvm:function-calling-convention ,func) :fast)
+                              (mapc #'(setf llvm:value-name)
+                                    ',(mapcar (compose #'string-downcase #'first) args)
+                                    (llvm:params ,func))
+                              (llvm:with-object (,builder builder)
+                                (llvm:position-builder-at-end builder
+                                                              (llvm:append-basic-block ,func "entry"))
+                                (destructuring-bind ,(mapcar #'first args)
+                                    (llvm:params ,func)
+                                  ,@llvm)))))
+             *primfun-builders*)
+       (bind *primitives-env* :value ,symbol ,value))))
 
 (defmacro defprimpoly (name vars return-type args (builder) &body instantiator)
   (with-gensyms (module sym type qvars subenv func inst-type)
@@ -141,8 +141,8 @@
                                   (type-eval ,return-type ,subenv))))))))
        (bind *primitives-env* :value ,sym
              (make-instance
-              'prim-poly-var
-              :var-type ,type
+              'prim-poly-value
+              :value-type ,type
               :env *primitives-env*
               :name ,sym
               :llvm
