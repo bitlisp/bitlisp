@@ -209,21 +209,29 @@
              (var (make-instance 'value
                                  :name name
                                  :env env
-                                 :value-type (apply #'make-ftype rtype
-                                                  (mapcar #'second
-                                                          typed-args)))))
+                                 :value-type (if args
+                                                 (apply #'make-ftype
+                                                        (apply #'make-prodty
+                                                               (mapcar #'second
+                                                                       typed-args))
+                                                         rtype)
+                                                 (tyapply (lookup "ptr") return-type)))))
         (bind env :value name var)
         (list* self var rtype typed-args)))
-    ((declare (ignore name return-type args))
-      nil)
+    ((make-form (value-type name)
+                (list* self name return-type args)))
     (module builder ctype
-      (declare (ignore builder ctype return-type args))
-      (let* ((cfunc (llvm:add-function module (name (name name)) (llvm (value-type name))))
-             (blfunc (llvm:add-function module (var-fqn name) (llvm (value-type name))))
-             (entry (llvm:append-basic-block blfunc "entry")))
-        (llvm:add-function-attributes blfunc :inline-hint)
-        (setf (llvm:function-calling-convention blfunc) :fast
-              (llvm name) blfunc)
-        (llvm:with-object (builder builder)
-          (llvm:position-builder-at-end builder entry)
-          (llvm:build-ret builder (llvm:build-call builder cfunc (llvm:params blfunc) ""))))))
+      (declare (ignore builder return-type))
+      (if args
+          ;; Function
+          (let* ((cfunc (llvm:add-function module (name (name name)) (llvm ctype)))
+                 (blfunc (llvm:add-function module (var-fqn name) (llvm ctype)))
+                 (entry (llvm:append-basic-block blfunc "entry")))
+            (llvm:add-function-attributes blfunc :inline-hint)
+            (setf (llvm:function-calling-convention blfunc) :fast
+                  (llvm name) blfunc)
+            (llvm:with-object (builder builder)
+              (llvm:position-builder-at-end builder entry)
+              (llvm:build-ret builder (llvm:build-call builder cfunc (llvm:params blfunc) ""))))
+          ;; Variable
+          (llvm:add-global module (llvm ctype) (name (name name))))))
