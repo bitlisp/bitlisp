@@ -183,6 +183,15 @@
     ((or bl-symbol string) (lookup code :type env))
     (list (mapcar (rcurry #'type-resolve env) code))))
 
+(defun type-resolve-free (code &optional (env *primitives-env*))
+  "Like type-resolve, but binds free variables. Kind inference must be done on the result."
+  (etypecase code
+    (integer code)
+    ((or bl-symbol string) (or (lookup code :type env)
+                               (bind env :type (ensure-bl-sym code)
+                                     (make-instance 'tyvar))))
+    (list (mapcar (rcurry #'type-resolve-free env) code))))
+
 (defun type-construct (resolved &optional (env *primitives-env*))
   (etypecase resolved
     ((or integer bl-type) resolved)

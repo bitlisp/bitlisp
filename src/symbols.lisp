@@ -23,3 +23,9 @@
         (setf (gethash (name symbol) *symbol-name-table*) symbol))))
 
 (defun sym (name) (make-bl-symbol name))
+
+(defun ensure-bl-sym (thing)
+  (etypecase thing
+    (symbol (ensure-bl-sym (string thing)))
+    (string (make-bl-symbol thing))
+    (bl-symbol thing)))
