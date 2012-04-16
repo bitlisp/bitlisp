@@ -20,25 +20,22 @@
                            :output *standard-output* :error *error-output*))))))
 
 (defun compile-unit (sexps base-module &key (outpath "./bitlisp.bc") main-unit?)
-  (multiple-value-bind (module-form predicates unit-module)
-      (build-types (env base-module) (first sexps))
-    (assert (and (listp (form-code module-form))
-                 (eq (first (form-code module-form)) (lookup "module")))
-            ()
-            "Compilation units must begin with a module declaration! (got ~A)"
-            module-form)
-    (llvm:with-object (llvm-module module (module-fqn unit-module))
-      (codegen llvm-module nil module-form)
+  (multiple-value-bind (module-decl module) (resolve (first sexps) (env base-module))
+    (assert module ()
+            "Compilation units must begin with a module declaration!")
+    (llvm:with-object (llvm-module module (module-fqn module))
+      (codegen llvm-module nil (infer-expr module-decl))
       ;; nil IR builder argument here indicates toplevel
       ;; TODO: Toplevel forms should be permissible and execute before main
       (mapc (compose (curry #'codegen llvm-module nil)
-                     (curry #'build-types (env unit-module)))
+                     #'infer-expr
+                     (rcurry #'resolve (env module)))
             (rest sexps))
-      (dolist (export (exports unit-module))
-        (setf (llvm:linkage (llvm (lookup export :value (env unit-module)))) :external))
+      (dolist (export (exports module))
+        (setf (llvm:linkage (llvm (lookup export :value (env module)))) :external))
       (when main-unit?
         (multiple-value-bind (var exists?)
-            (lookup "main" :value (env unit-module))
+            (lookup "main" :value (env module))
           (assert exists? () "No main bound in ~A" base-module)
           (compile-main llvm-module var)))
       (llvm:write-bitcode-to-file llvm-module outpath))))

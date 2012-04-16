@@ -121,19 +121,26 @@
 (defspecial "module" self (name imports &rest exports)
     (env
       (assert (toplevel? env) () "Cannot change modules below the top level")
-      (let ((import-modules (mapcar (rcurry #'lookup :value env) imports)))
-        (let ((module (make-module name (module env)
-                                   import-modules
-                                   exports)))
-          (values (list* self name import-modules exports)
+      (let ((import-modules (mapcar (rcurry #'lookup :value env) imports))
+            value-names type-names interface-names)
+        (dolist (export exports)
+          (if (atom export)
+              (push export value-names)
+              (ecase (first export)
+                (type (setf type-names (rest export)))
+                (interface (setf interface-names (rest export))))))
+        (let ((module (make-module name (module env) import-modules
+                                   :value-exports value-names
+                                   :type-exports type-names
+                                   :interface-exports interface-names)))
+          (values (list* self (lookup name :value env) import-modules exports)
                   module))))
     ((declare (ignore name imports exports))
-      nil)
+      (make-form (lookup "Unit") (list* self name imports exports)))
     (lmodule builder type
       (declare (ignore builder name exports type))
       (dolist (import imports)
-        (dolist (export (exports import))
-          ;; TODO: Import non-values
+        (dolist (export (value-exports import))
           (let ((remote-binding (lookup export :value (env import))))
             (when (and (typep remote-binding 'value)
                        (null (vars (value-type remote-binding))))

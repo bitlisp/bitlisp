@@ -50,10 +50,10 @@
 (defun infer-expr (expr)
   "(values form preds subst)"
   (typecase expr
-    (var (let ((qualty (fresh-instance (value-type expr))))
-           (values (make-form (head qualty) expr)
-                   (copy-list (context qualty))
-                   nil)))
+    (value (let ((qualty (fresh-instance (value-type expr))))
+             (values (make-form (head qualty) expr)
+                     (copy-list (context qualty))
+                     nil)))
     (list (destructuring-bind (operator &rest args) expr
             (typecase operator
               (special-op (apply (special-op-inferrer operator) args))
