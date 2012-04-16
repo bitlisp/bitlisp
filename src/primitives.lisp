@@ -64,22 +64,6 @@
         (nconc (flatten-product l) (flatten-product r)))
       (list product)))
 
-(defmacro defint (name width signed)
-  ;; TODO: Don't just alias.
-  (with-gensyms (sym)
-    `(let ((,sym (make-bl-symbol ,name)))
-       (bind *primitives-env* :type ,sym
-             (tyapply ,(if signed
-                           '(lookup "int" :type)
-                           '(lookup "uint" :type))
-                      ,width)))))
-;;; TODO: Architecture portability for word type
-(defint "word"      32 t)
-(defint "uword"     32 nil)
-(defint "byte"      8  t)
-(defint "ubyte"     8  nil)
-(defint "codepoint" 32 nil)
-
 (defparameter *primfun-builders* nil)
 
 (defun build-primfuns (bl-module llvm-module)
