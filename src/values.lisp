@@ -15,7 +15,7 @@
               :documentation "(bl-type . llvm) alist for cached compiled instances of polymorphic values")
    (form :initarg :form :accessor form)))
 
-(defclass prim-poly-value (poly-value) ()
+(defclass prim-poly-value (value) ()
   (:documentation "Like a regular value, except the llvm slot holds a function that takes an LLVM module and the instantiation type"))
 
 (defmethod print-object ((value value) stream)
