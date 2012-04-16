@@ -146,7 +146,7 @@
               :env *primitives-env*
               :name ,sym
               :llvm
-              (lambda (,module ,inst-type)
+              (lambda (,inst-type ,module)
                 (prog1-let (,func (llvm:add-function ,module (concatenate 'string (module-fqn nil) ":" ,name "!" (princ-to-string ,type)) (llvm ,inst-type)))
                   (llvm:with-object (,builder builder)
                     (llvm:position-builder-at-end ,builder (llvm:append-basic-block ,func "entry"))

@@ -49,7 +49,7 @@
   ((kind :initarg :kind :reader kind)))
 
 (defmethod subst-apply (s (var tyvar))
-  (or (cdr (assoc var s)) var))
+  (or (assoc-value s var :test 'eq) var))
 
 (defmethod bl-type= ((a tyvar) (b tyvar))
   (eq a b))
@@ -390,7 +390,22 @@
                  :args (instantiate types (args gentype))))
 
 (defun fresh-instance (scheme)
-  (instantiate (mapcar (lambda (v)
-                         (make-instance 'tyvar :kind (kind v)))
-                       (vars scheme))
-               (inner-type scheme)))
+  (let ((vars (mapcar (lambda (v)
+                        (make-instance 'tyvar :kind (kind v)))
+                      (vars scheme))))
+    (instantiate vars (inner-type scheme))))
+
+(defun instantiate-form (types form)
+  (destructuring-bind (type . code) form
+    (make-form (instantiate types type)
+               (if (listp code)
+                   (mapcar (curry #'instantiate-form types) code)
+                   (instantiate-form types code)))))
+
+(defun specialize-form (poly-form monotype)
+  (let ((vars (mapcar (lambda (v)
+                        (make-instance 'tyvar :kind (kind v)))
+                      (vars (form-type poly-form)))))
+    (let* ((var-form (instantiate-form vars poly-form))
+           (subst (unify (form-type var-form) monotype)))
+      (subst-code subst var-form))))

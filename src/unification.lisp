@@ -84,6 +84,9 @@
       (make-subst a b)
       (error "kind mismatch: ~A ≠ ~A" (kind a) (kind b))))
 
+(defmethod match (a (b tyvar))
+  (match b a))
+
 (defmethod match ((a tycon) (b tycon))
   (if (bl-type= a b)
       nil
