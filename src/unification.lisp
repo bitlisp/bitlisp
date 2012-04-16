@@ -6,6 +6,10 @@
     (declare (ignore a b))
     (error "structural mismatch")))
 
+(defmethod unify :around (a b)
+  (handler-bind ((simple-error #'(lambda (e) (error "Unable to unify ~A with ~A: ~A" a b e))))
+    (call-next-method)))
+
 (defmethod unify ((a list) (b list))
   (let ((subst (unify (first a) (first b))))
     (subst-compose (unify (subst-apply subst (rest a))
@@ -24,8 +28,7 @@
 (defmethod unify ((a tyvar) b)
   (cond ((bl-type= a b) nil)
         ((member a (free-vars b))
-         (error "Recursion check fails: ~S occurs in ~S"
-                a b))
+         (error "Recursion check fails"))
         ((/= (kind a) (kind b))
          (error "Kind mismatch: ~A ≠ ~A"
                 (kind a) (kind b)))
@@ -37,7 +40,7 @@
 (defmethod unify ((a tycon) (b tycon))
   (if (bl-type= a b)
       nil
-      (error "Constructor mismatch: ~S ≠ ~S" a b)))
+      (error "Constructor mismatch")))
 
 (defmethod unify ((a pred) (b pred))
   (if (eq (interface a) (interface b))
@@ -66,8 +69,8 @@
     (error "fell through all cases")))
 
 (defmethod match :around (a b)
-  (handler-case (call-next-method)
-    (simple-error (e) (error "Unable to match ~A with ~A: ~A" a b e))))
+  (handler-bind ((simple-error (lambda (e) (error "Unable to match ~A with ~A: ~A" a b e))))
+    (call-next-method)))
 
 (defmethod match ((a list) (b list))
   (reduce #'subst-merge (mapcar #'match a b)))
