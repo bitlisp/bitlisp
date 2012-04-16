@@ -99,14 +99,15 @@
                              (unify (head (fresh-instance (value-type name)))
                                     (form-type vform))))
                (vty (subst-apply final-subst (form-type vform))))
-          ;; TODO: Propogate quantification substitution to form body
           (setf (value-type name) (subst-apply final-subst (value-type name)))
           ;; TODO: Pass in free type vars collected from non-global value bindings
           (multiple-value-bind (deferred retained) (split-preds nil (free-vars vty)
                                                                 (subst-apply final-subst vpreds))
-            (values (quantify-form (free-vars vty)
-                                   retained
-                                   (make-form vty (list self name (subst-code final-subst vform))))
+            (values (setf (form name)
+                          (quantify-form
+                           (free-vars vty)
+                           retained
+                           (make-form vty (list self name (subst-code final-subst vform)))))
                     deferred)))))
     (module builder type
       ;; TODO: Non-function values

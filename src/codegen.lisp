@@ -75,7 +75,7 @@
                                                   '(0 0)))))
       (integer (llvm:const-int (llvm type) code))
       (real (llvm:const-real (llvm type) code))
-      (var (if (typep code 'poly-value)
+      (value (if (vars (value-type code))
                (poly-value-instance code type llvm-module)
                (llvm code)))
       (list
@@ -92,8 +92,7 @@
 (defun poly-value-instance (poly-value monotype llvm-module)
   (or (assoc-value (instances poly-value) monotype :test #'bl-type=)
       (setf (assoc-value (instances poly-value) monotype :test #'bl-type=)
-            (etypecase poly-value
-              (prim-poly-value (funcall (llvm poly-value) monotype llvm-module))
-              (regular-poly-value
-               (codegen llvm-module nil
-                        (specialize-form (form poly-value) monotype)))))))
+            (if (typep poly-value 'prim-poly-value)
+                (funcall (llvm poly-value) monotype llvm-module)
+                (codegen llvm-module nil
+                         (specialize-form (form poly-value) monotype))))))
