@@ -181,10 +181,8 @@
                                        :supers preds)))
         (bind env :interface name interface)
         (loop :for (name type default) :in bindings
-              :for resolved := (type-resolve type subenv)
-              :do (loop :for (gen . kind) :in (infer-kinds resolved)
-                        :do (setf (kind gen) kind))
-                  (bind env :value name
+              :for resolved := (infer-kinds (type-resolve type subenv))
+              :do (bind env :value name
                         (make-instance
                          'value
                          :name name

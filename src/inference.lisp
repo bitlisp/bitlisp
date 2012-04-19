@@ -73,11 +73,13 @@
                reduced)))
 
 (defun infer-kinds (resolved-type &optional (arg-count 0))
-  "Takes a resolved type form and returns a (tyvar/tygen . kind) alist."
+  "Takes a resolved type form and returns a type form with kinds set appropriately"
   (assert (not (null resolved-type)))
   (etypecase resolved-type
-    ((or tyvar tygen) (list (cons resolved-type (1+ arg-count))))
-    (list (apply #'nconc
-                 (infer-kinds (first resolved-type) (length (rest resolved-type)))
+    (tygen (make-instance 'tygen
+                          :number (number resolved-type)
+                          :kind (1+ arg-count)))
+    (tyvar (make-instance 'tyvar :kind (1+ arg-count)))
+    (list (list* (infer-kinds (first resolved-type) (length (rest resolved-type)))
                  (mapcar #'infer-kinds (rest resolved-type))))
-    ((or bl-type integer) nil)))
+    ((or bl-type integer) resolved-type)))
