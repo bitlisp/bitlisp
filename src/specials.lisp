@@ -106,7 +106,8 @@
                                             (make-form vty (subst-code final-subst vform)))))
              (setf (form name) final-form)
              (values (make-form (form-type final-form) (list self name final-form))
-                     deferred))))))
+                     deferred
+                     nil))))))
     (module builder type
       ;; TODO: Non-function values
       ;; TODO: Auto-create pointer specialization of polymorphic functions
@@ -133,15 +134,18 @@
               (final-subst (subst-compose subst (unify (head unif-type)
                                                        (form-type form))))
               (final-type (subst-apply final-subst unif-type))
-              (final-preds (nconc (context final-type) (subst-apply final-subst preds)))
-              (final-form (quantify-form (free-vars final-type) final-preds
-                                         (make-form (head final-type)
-                                                    (subst-code final-subst value)))))
-         (setf (form name) final-form)
-         (values (make-form (form-type final-form) (list self (form-type final-form)
-                                                         name final-form))
-                 final-preds
-                 nil))))
+              (final-preds (nconc (context final-type) (subst-apply final-subst preds))))
+         (multiple-value-bind (deferred retained) (split-preds nil (free-vars final-type)
+                                                               final-preds)
+           (let ((final-form (quantify-form (free-vars final-type)
+                                            retained
+                                            (make-form (head final-type)
+                                                       (subst-code final-subst value)))))
+             (setf (form name) final-form)
+             (values (make-form (form-type final-form) (list self (form-type final-form)
+                                                             name final-form))
+                     deferred
+                     nil))))))
     (module builder type
       (declare (ignore declared-type))
       ;; TODO: Non-function values
