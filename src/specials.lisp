@@ -24,9 +24,8 @@
         (mapc (curry #'bind new-env :value) args arg-vars)
         (list* self arg-vars
                (mapcar (rcurry #'resolve new-env) body))))
-    (;; TODO: Probably shouldn't mutate here.
-     (let ((arg-types (loop :repeat (length args) :collect (make-instance 'tyvar :kind 1))))
-       (mapc (lambda (var ty) (setf (value-type var) (to-scheme ty)))
+    ((let ((arg-types (loop :repeat (length args) :collect (make-instance 'tyvar :kind 1))))
+       (mapc (lambda (arg ty) (setf (value-type arg) (to-scheme ty)))
              args arg-types)
        (multiple-value-bind (forms preds subst) (infer-expr-seq body)
          (values (make-form (make-ftype (apply #'make-prodty arg-types)
@@ -88,28 +87,63 @@
 
 (defspecial "def" self (name value)
     (env
-      (let ((var (make-instance 'value :name name :env env)))
+      (let ((var (make-instance 'value
+                                :name name :env env
+                                :value-type (to-scheme (make-instance 'tyvar :kind 1)))))
         (bind env :value name var)
         (list self var (resolve value env))))
-    ((setf (value-type name) (to-scheme (make-instance 'tyvar :kind 1)))
-      (multiple-value-bind (vform vpreds vsubst)
-          (infer-expr value)
-        (let* ((final-subst (subst-compose
-                             vsubst
-                             (unify (head (fresh-instance (value-type name)))
-                                    (form-type vform))))
-               (vty (subst-apply final-subst (form-type vform))))
-          (setf (value-type name) (subst-apply final-subst (value-type name)))
-          ;; TODO: Pass in free type vars collected from non-global value bindings
-          (multiple-value-bind (deferred retained) (split-preds nil (free-vars vty)
-                                                                (subst-apply final-subst vpreds))
-            (values (setf (form name)
-                          (quantify-form
-                           (free-vars vty)
-                           retained
-                           (make-form vty (list self name (subst-code final-subst vform)))))
-                    deferred)))))
+    ((multiple-value-bind (vform vpreds vsubst) (infer-expr value)
+       (let* ((final-subst (subst-compose vsubst
+                                          (unify (head (fresh-instance (value-type name)))
+                                                 (form-type vform))))
+              (vty (subst-apply final-subst (form-type vform))))
+         (setf (value-type name) (subst-apply final-subst (value-type name)))
+         ;; TODO: Pass in free type vars collected from non-global value bindings
+         (multiple-value-bind (deferred retained) (split-preds nil (free-vars vty)
+                                                               (subst-apply final-subst vpreds))
+           (let ((final-form (quantify-form (free-vars vty)
+                                            retained
+                                            (make-form vty (subst-code final-subst vform)))))
+             (setf (form name) final-form)
+             (values (make-form (form-type final-form) (list self name final-form))
+                     deferred))))))
     (module builder type
+      ;; TODO: Non-function values
+      ;; TODO: Auto-create pointer specialization of polymorphic functions
+      (unless (vars type)
+        (let ((llvm-value (codegen module builder value)))
+          (setf (llvm:value-name llvm-value) (var-fqn name)
+                (llvm:linkage llvm-value) :internal
+                (llvm name) llvm-value)))))
+
+(defspecial "def-typed" self (declared-type name value)
+    (env
+      (let* ((subenv (make-subenv env))
+             (scheme (let ((ty (type-construct (infer-kinds (type-resolve-free declared-type subenv)))))
+                       ;; TODO: Allow constraints to be specified
+                       (quantify (free-vars ty) nil ty)))
+             (var (make-instance 'value
+                                 :name name :env env
+                                 :value-type scheme)))
+        (bind env :value name var)
+        ;; Resolve in type-binding subenv for scoped type variables!
+        (list self scheme var (resolve value subenv))))
+    ((multiple-value-bind (form preds subst) (infer-expr value)
+       (let* ((unif-type (fresh-instance declared-type))
+              (final-subst (subst-compose subst (unify (head unif-type)
+                                                       (form-type form))))
+              (final-type (subst-apply final-subst unif-type))
+              (final-preds (nconc (context final-type) (subst-apply final-subst preds)))
+              (final-form (quantify-form (free-vars final-type) final-preds
+                                         (make-form (head final-type)
+                                                    (subst-code final-subst value)))))
+         (setf (form name) final-form)
+         (values (make-form (form-type final-form) (list self (form-type final-form)
+                                                         name final-form))
+                 final-preds
+                 nil))))
+    (module builder type
+      (declare (ignore declared-type))
       ;; TODO: Non-function values
       ;; TODO: Auto-create pointer specialization of polymorphic functions
       (unless (vars type)
