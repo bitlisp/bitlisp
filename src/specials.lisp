@@ -179,6 +179,8 @@
 (defspecial "def-type-name" self (name type)
     (env
       (let ((ty (type-eval type env)))
+        (when (free-vars ty)
+          (error "Cannot declare another name for a polytype (~A)" ty))
         (bind env :type name ty)
         nil))
     ((declare (ignore name type)))
