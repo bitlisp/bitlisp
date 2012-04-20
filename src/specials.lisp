@@ -55,7 +55,7 @@
                  subst))))
     (module builder type
       (declare (ignore builder))
-      (prog1-let (func (llvm:add-function module "lambda" (llvm type)))
+      (prog1-let (func (llvm:add-function module "function" (llvm type)))
         (setf (llvm:linkage func) :internal
               (llvm:function-calling-convention func) :fast)
         (mapc (lambda (param var) (setf (llvm var) param
