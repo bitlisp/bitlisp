@@ -46,7 +46,7 @@
 (defclass bl-type () ())
 
 (defclass tyvar (bl-type)
-  ((kind :initarg :kind :reader kind)))
+  ((kind :initarg :kind :accessor kind)))
 
 (defmethod subst-apply (s (var tyvar))
   (or (assoc-value s var :test 'eq) var))
