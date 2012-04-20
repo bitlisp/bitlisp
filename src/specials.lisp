@@ -117,7 +117,7 @@
                 (llvm:linkage llvm-value) :internal
                 (llvm name) llvm-value)))))
 
-(defspecial "def-typed" self (declared-type name value)
+(defspecial "def-as" self (declared-type name value)
     (env
       (let* ((subenv (make-subenv env))
              (scheme (let ((ty (type-construct (infer-kinds (type-resolve-free declared-type subenv)))))
