@@ -174,7 +174,7 @@
           (values (list* self (lookup name :value env) import-modules exports)
                   module))))
     ((declare (ignore name imports exports))
-      (make-form (lookup "Unit") (list* self name imports exports)))
+      (make-form (lookup "unit") (list* self name imports exports)))
     (lmodule builder type
       (declare (ignore builder name exports type))
       (dolist (import imports)
