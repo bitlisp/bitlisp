@@ -262,7 +262,7 @@
                                         :vars gens
                                         :inner-type
                                         (qualify (list (apply #'make-pred interface gens))
-                                                 (type-construct resolved subenv))))))
+                                                 (type-construct resolved))))))
         nil))
     ((declare (ignore name vars supers bindings)))
     (m b ty
