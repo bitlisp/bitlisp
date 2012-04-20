@@ -180,7 +180,8 @@
 (defun type-resolve (code &optional (env *primitives-env*))
   (etypecase code
     (integer code)
-    ((or bl-symbol string) (lookup code :type env))
+    ((or bl-symbol string) (or (lookup code :type env)
+                               (error "~A names no type binding!" code)))
     (list (mapcar (rcurry #'type-resolve env) code))))
 
 (defun type-resolve-free (code &optional (env *primitives-env*))
