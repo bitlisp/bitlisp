@@ -20,7 +20,7 @@
 (defvar *primitives-env* (make-instance 'environment :toplevel? t)
   "Environment in which all primitive operators are bound")
 
-(defun bindings (env &optional (namespace :value))
+(defun env-bindings (env &optional (namespace :value))
   (ecase namespace
     (:value (value-bindings env))
     (:type (type-bindings env))
@@ -30,7 +30,7 @@
   (when (stringp symbol)
     (setf symbol (make-bl-symbol symbol)))
   (if env
-      (multiple-value-bind (place exists) (gethash symbol (bindings env namespace))
+      (multiple-value-bind (place exists) (gethash symbol (env-bindings env namespace))
         (if exists
             (values place t)
             (loop for parent in (parents env)
@@ -44,13 +44,13 @@
   (etypecase symbol
     (string (setf symbol (make-bl-symbol symbol)))
     (bl-symbol))
-  (multiple-value-bind (old-value exists) (gethash symbol (bindings env))
+  (multiple-value-bind (old-value exists) (gethash symbol (env-bindings env))
     (when exists
       (warn "Rebinding ~A to ~A (was ~A) in ~A" symbol value old-value env)))
-  (setf (gethash symbol (bindings env namespace)) value))
+  (setf (gethash symbol (env-bindings env namespace)) value))
 
 (defun unbind (env symbol &optional (namespace :value))
-  (remhash symbol (bindings env namespace)))
+  (remhash symbol (env-bindings env namespace)))
 
 (defun resolve (source &optional (env *primitives-env*))
   "Lower code into internal representations"
