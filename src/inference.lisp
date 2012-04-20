@@ -76,10 +76,12 @@
   "Takes a resolved type form and returns a type form with kinds set appropriately"
   (assert (not (null resolved-type)))
   (etypecase resolved-type
-    (tygen (make-instance 'tygen
-                          :number (number resolved-type)
-                          :kind (1+ arg-count)))
-    (tyvar (make-instance 'tyvar :kind (1+ arg-count)))
+    (tygen (if (slot-boundp resolved-type 'kind)
+               resolved-type
+               (setf (kind resolved-type) (1+ arg-count))))
+    (tyvar (if (slot-boundp resolved-type 'kind)
+               resolved-type
+               (setf (kind resolved-type) (1+ arg-count))))
     (list (list* (infer-kinds (first resolved-type) (length (rest resolved-type)))
                  (mapcar #'infer-kinds (rest resolved-type))))
     ((or bl-type integer) resolved-type)))
