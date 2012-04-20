@@ -79,7 +79,7 @@
                    (nconc cpreds tpreds epreds)
                    (subst-compose
                     (subst-compose (subst-compose csubst tsubst) esubst)
-                    (unify (form-type tform) (lookup "Bool" :type))))))))
+                    (unify (form-type tform) (lookup "bool" :type))))))))
     (module builder type
       (let* ((cond-result (codegen module builder condition))
              (func (llvm:basic-block-parent (llvm:insertion-block builder)))

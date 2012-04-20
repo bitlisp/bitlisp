@@ -10,7 +10,7 @@
                            :llvm (lambda ,args ,@builder))))))
 
 (defctor "unit"   () (llvm:void-type))
-(defctor "Bool"   () (llvm:int1-type))
+(defctor "bool"   () (llvm:int1-type))
 (defctor "float"  () (llvm:float-type))
 (defctor "double" () (llvm:double-type))
 (defctor "int" (bits)
@@ -30,7 +30,7 @@
   (llvm:pointer-type (llvm inner-type)))
 (defctor "vector" (inner-type count)
   (check-type count integer)
-  (assert (or (eq inner-type (lookup "Bool" :type))
+  (assert (or (eq inner-type (lookup "bool" :type))
               (and (typep inner-type 'tyapp)
                    (member (operator inner-type)
                            (list (lookup "int" :type)
@@ -172,7 +172,7 @@
         (loop :for type :in types :nconc
           (loop :for op :in ops :collect
                 `(defprimpoly ,(concatenate 'string (string-downcase type) (string op))
-                     (a) "Bool" ((lhs `(,,type ,a)) (rhs `(,,type ,a))) (builder)
+                     (a) "bool" ((lhs `(,,type ,a)) (rhs `(,,type ,a))) (builder)
                    (llvm:build-ret builder (llvm:build-i-cmp builder ,op lhs rhs "")))))))
 
 (deficmps ("int" "uint") :> :< := :/= :>= :<=)
