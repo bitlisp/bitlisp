@@ -156,6 +156,15 @@
                 (llvm:linkage llvm-value) :internal
                 (llvm name) llvm-value)))))
 
+(defspecial "def-type-name" self (name type)
+    (env
+      (let ((ty (type-eval type env)))
+        (bind env :type name ty)
+        nil))
+    ((declare (ignore name type)))
+    (m b c
+      (declare (ignore name type m b c))))
+
 (defspecial "module" self (name imports &rest exports)
     (env
       (assert (toplevel? env) () "Cannot change modules below the top level")
