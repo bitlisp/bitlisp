@@ -117,7 +117,6 @@
                                           (unify (head (fresh-instance (value-type name)))
                                                  (form-type vform))))
               (vty (subst-apply final-subst (form-type vform))))
-         (setf (value-type name) (subst-apply final-subst (value-type name)))
          ;; TODO: Pass in free type vars collected from non-global value bindings
          (multiple-value-bind (deferred retained) (split-preds nil (free-vars vty)
                                                                (subst-apply final-subst vpreds))
@@ -125,6 +124,7 @@
                                             retained
                                             (make-form vty (subst-code final-subst vform)))))
              (setf (form name) final-form)
+             (setf (value-type name) (form-type final-form))
              (values (make-form (form-type final-form) (list self name final-form))
                      deferred
                      nil))))))
