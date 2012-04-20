@@ -182,7 +182,11 @@
     (integer code)
     ((or bl-symbol string) (or (lookup code :type env)
                                (error "~A names no type binding!" code)))
-    (list (mapcar (rcurry #'type-resolve env) code))))
+    (list (let ((ctor (type-resolve (first code) env)))
+            (typecase ctor
+              (special-tycon (apply (special-tycon-resolver ctor)
+                                    env (rest code)))
+              (t (cons ctor (mapcar (rcurry #'type-resolve env) (rest code)))))))))
 
 (defun type-resolve-free (code &optional (env *primitives-env*))
   "Like type-resolve, but binds free variables. Kind inference must be done on the result."
@@ -193,15 +197,18 @@
                                      (make-instance 'tyvar))))
     (list (mapcar (rcurry #'type-resolve-free env) code))))
 
-(defun type-construct (resolved &optional (env *primitives-env*))
+(defun type-construct (resolved)
   (etypecase resolved
     ((or integer bl-type) resolved)
-    (list (destructuring-bind (constructor &rest args)
-              (mapcar (rcurry #'type-construct env) resolved)
-            (apply #'tyapply constructor args)))))
+    (list (unless (null resolved)
+            (destructuring-bind (constructor &rest args) resolved
+              (typecase constructor
+                (special-tycon (apply (special-tycon-constructor constructor)
+                                      args))
+                (t (apply #'tyapply (mapcar #'type-construct resolved)))))))))
 
 (defun type-eval (code &optional (env *primitives-env*))
-  (type-construct (type-resolve code env) env))
+  (type-construct (type-resolve code env)))
 
 (defun constraint-eval (code &optional (env *primitives-env*))
   (destructuring-bind (interface &rest args) code

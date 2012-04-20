@@ -6,6 +6,12 @@
   (print-unreadable-object (value stream :type t)
     (princ (special-op-name value) stream)))
 
+(defstruct special-tycon name resolver constructor)
+
+(defmethod print-object ((value special-tycon) stream)
+  (print-unreadable-object (value stream :type t)
+    (princ (special-op-name value) stream)))
+
 (defclass value ()
   ((name :initarg :name :reader name)
    (env :initarg :env :reader env)

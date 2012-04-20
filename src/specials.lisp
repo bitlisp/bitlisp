@@ -1,5 +1,25 @@
 (in-package #:bitlisp)
 
+(defmacro def-type-special (name self (&rest args) (env &rest resolver) constructor)
+  (with-gensyms (sym)
+    `(let* ((,sym (make-bl-symbol ,name))
+            (,self (make-special-tycon :name ,sym)))
+       (bind *primitives-env* :type ,sym ,self)
+       (setf (special-tycon-resolver ,self) (lambda (,env ,@args) ,@resolver)
+             (special-tycon-constructor ,self) (lambda ,args ,@constructor)))))
+
+(def-type-special "forall" self (vars constraints type)
+    (env (let ((subenv (make-subenv env)))
+           (let ((tyvars (loop :repeat (length vars)
+                               :collect (make-instance 'tyvar))))
+             (mapc (curry #'bind subenv :type) vars tyvars)
+             (list self tyvars
+                   (mapcar (rcurry #'constraint-eval subenv)
+                           constraints)
+                   (infer-kinds (type-resolve type subenv))))))
+    ((declare (ignore vars))
+     (values (type-construct type) constraints)))
+
 (defmacro defspecial (name self (&rest args)
                       (env &body resolver)
                       (&body inferrer)
@@ -120,9 +140,9 @@
 (defspecial "def-as" self (declared-type name value)
     (env
       (let* ((subenv (make-subenv env))
-             (scheme (let ((ty (type-construct (infer-kinds (type-resolve-free declared-type subenv)))))
-                       ;; TODO: Allow constraints to be specified
-                       (quantify (free-vars ty) nil ty)))
+             (scheme
+               (multiple-value-bind (ty preds) (type-eval declared-type env)
+                 (quantify (free-vars ty) preds ty)))
              (var (make-instance 'value
                                  :name name :env env
                                  :value-type scheme)))
@@ -204,10 +224,11 @@
                       (llvm remote-binding) val))))))))
 
 (defspecial "the" self (type value)
-    (env (list self (type-eval type env) (resolve value env)))
-    ((multiple-value-bind (form preds subst) (infer-expr value)
-       (values form preds
-               (subst-compose subst (unify (form-type form) type)))))
+    (env (list self (type-resolve type env) (resolve value env)))
+    ((multiple-value-bind (form val-preds subst) (infer-expr value)
+       (multiple-value-bind (ty ty-preds) (type-construct type)
+         (values form (nconc ty-preds val-preds)
+                 (subst-compose subst (unify (form-type form) ty))))))
     (m b ty
       (declare (ignore m b ty type value))
       (error "What's this doing here?")))
