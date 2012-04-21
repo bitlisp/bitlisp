@@ -14,7 +14,7 @@
   (:method ((a integer) (b integer))
     "Integral types intended for use as primitive constructor parameters"
     (= a b)))
-(defgeneric subst-apply (substitution thing)
+(defgeneric subst-apply (substitution type)
   (:method (s ty)
     (declare (ignore s))
     ty)
@@ -342,6 +342,9 @@
 
 (defmethod free-vars ((scheme scheme))
   (free-vars (inner-type scheme)))
+
+(defmethod bl-type= ((a scheme) (b scheme))
+  (bl-type= (inner-type a) (inner-type b)))
 
 (defun subst-code (substitution tree)
   (cond

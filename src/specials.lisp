@@ -123,7 +123,7 @@
            (let ((final-form (quantify-form (free-vars vty)
                                             retained
                                             (make-form vty (subst-code final-subst vform)))))
-             (setf (form name) final-form)
+             (setf (code name) (form-code final-form))
              (setf (value-type name) (form-type final-form))
              (values (make-form (form-type final-form) (list self name final-form))
                      deferred
@@ -153,15 +153,24 @@
        (let* ((unif-type (fresh-instance declared-type))
               (final-subst (subst-compose subst (unify (head unif-type)
                                                        (form-type form))))
+              (declared-preds (subst-apply final-subst (context unif-type)))
               (final-type (subst-apply final-subst unif-type))
-              (final-preds (nconc (context final-type) (subst-apply final-subst preds))))
+              (inferred-preds (remove-if (curry #'entail declared-preds)
+                                         (subst-apply final-subst preds))))
          (multiple-value-bind (deferred retained) (split-preds nil (free-vars final-type)
-                                                               final-preds)
+                                                               inferred-preds)
            (let ((final-form (quantify-form (free-vars final-type)
-                                            retained
+                                            declared-preds
                                             (make-form (head final-type)
                                                        (subst-code final-subst value)))))
-             (setf (form name) final-form)
+             (setf (code name) (form-code final-form))
+             (cond
+               (retained
+                (error "Declared context ~A is weaker than ~A"
+                       declared-preds inferred-preds))
+               ((not (bl-type= (value-type name) (form-type final-form)))
+                (error "Declared type ~A is more general than inferred type ~A"
+                       (value-type name) (form-type final-form))))
              (values (make-form (form-type final-form) (list self (form-type final-form)
                                                              name final-form))
                      deferred
