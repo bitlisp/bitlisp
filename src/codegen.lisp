@@ -1,5 +1,13 @@
 (in-package #:bitlisp)
 
+;; 01:26:54 < nicholas> Ralith: ah i see. opt -internalize changes the
+;;                      linkage type, iff you tell it what symbols are
+;;                      exported or your combined .bc has a function
+;;                      named main.
+;; 01:27:09 < nicholas> which is the first thing that -std-link-opts
+;;                      does internally
+;; 01:27:31 < nicholas> you can pass it the list of functions via
+;;                      -internalize-public-api-{file,list}=...
 (defun compile-full (sexps &key (outpath "./bitlisp.s") (speed 3) (assemble t))
   (let ((root-module (make-root)))
     (with-tmp-file (bc "bitlisp-")
@@ -13,8 +21,9 @@
         (ccl:run-program "llvm-link" (list "-o" bc core bc)
                          :output *standard-output* :error *error-output*))
       (let ((opt (format nil "-O~D" speed)))
-        (ccl:run-program "opt" (list opt "-o" (if assemble bc outpath) bc)
-                        :output *standard-output* :error *error-output*)
+        (ccl:run-program "opt" (list opt "-o" (if assemble bc outpath) bc
+                                     "-std-link-opts")
+                         :output *standard-output* :error *error-output*)
         (when assemble
           (ccl:run-program "llc" (list opt "-o" outpath bc)
                            :output *standard-output* :error *error-output*))))))
