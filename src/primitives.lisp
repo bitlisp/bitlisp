@@ -182,3 +182,7 @@
 (defprimpoly "store" (a) a ((pointer `("ptr" ,a)) (value a)) (builder)
   (llvm:build-store builder value pointer)
   (llvm:build-ret builder value))
+
+(defprimpoly "vector-elt" (ty size) ty ((vector `("vector" ,ty ,size)) (index '("int" 32))) (builder)
+  ;; TODO: Optional bounds checking
+  (llvm:build-extract-element builder vector index ""))
