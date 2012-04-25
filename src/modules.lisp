@@ -45,9 +45,9 @@
       (dolist (sym (value-exports import))
         (bind menv :value sym (lookup sym :value (env import))))
       (dolist (sym (interface-exports import))
-        (bind menv :interface sym (lookup sym :value (env import))))
+        (bind menv :interface sym (lookup sym :interface (env import))))
       (dolist (sym (type-exports import))
-        (bind menv :type sym (lookup sym :value (env import)))))
+        (bind menv :type sym (lookup sym :type (env import)))))
     (prog1-let (mod (make-instance
                      'module
                      :name name
