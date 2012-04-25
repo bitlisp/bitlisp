@@ -1,6 +1,0 @@
-(module types (core) (type word byte uword ubyte))
-
-(def-type-name word (int 32))
-(def-type-name uword (uint 32))
-(def-type-name byte (int 8))
-(def-type-name ubyte (uint 8))

@@ -1,0 +1,25 @@
+(module types (core) (type word byte uword ubyte))
+
+(def-type-name word (int 32))
+(def-type-name uword (uint 32))
+(def-type-name byte (int 8))
+(def-type-name ubyte (uint 8))
+
+(interface abelian-group (a) ()
+  (zero a)
+  (+ (func (* a a) a))
+  (- (func (* a a) a))
+  (negate (func a a)))
+
+(interface ring (a) ((abelian-group a))
+  (* (func (* a a) a))
+  (one a)
+  (from-word (func word a)))
+
+(interface euclidian-domain (a) ((ring a))
+  (/ (func (* a a) a))
+  (rem (func (* a a) a)))
+
+(interface division-ring (a) ((euclidian-domain a))
+  (recip (func a a))
+  (from-float (func float a)))
