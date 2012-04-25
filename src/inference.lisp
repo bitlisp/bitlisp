@@ -54,6 +54,7 @@
              (values (make-form (head qualty) expr)
                      (copy-list (context qualty))
                      nil)))
+    (null nil)
     (list (destructuring-bind (operator &rest args) expr
             (typecase operator
               (special-op (apply (special-op-inferrer operator) args))

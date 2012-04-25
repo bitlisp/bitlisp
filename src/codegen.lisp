@@ -69,31 +69,32 @@
           (llvm:build-ret builder call))))))
 
 (defun codegen (llvm-module builder form)
-  (destructuring-bind (type . code) form
-    (etypecase code
-      (string (let* ((value (llvm:const-string code nil))
-                     (global (llvm:add-global llvm-module (llvm:type-of value) "literal-str")))
-                (setf (llvm:initializer global) value
-                      (llvm:linkage global) :private
-                      (llvm:global-constant-p global) t)
-                (llvm:const-in-bounds-gep global
-                                          (mapcar (curry #'llvm:const-int (llvm:int32-type))
-                                                  '(0 0)))))
-      (integer (llvm:const-int (llvm type) code))
-      (real (llvm:const-real (llvm type) code))
-      (value (if (vars (value-type code))
-               (poly-value-instance code type llvm-module)
-               (llvm code)))
-      (list
-       (destructuring-bind (op &rest args) code
-         (etypecase op
-           (special-op (apply (special-op-codegen op)
-                              llvm-module builder type (print args)))
-           (form (let ((argvals (mapcar (curry #'codegen llvm-module builder)
-                                        args)))
-                   (prog1-let (call (llvm:build-call builder (codegen llvm-module builder op)
-                                                     argvals ""))
-                     (setf (llvm:instruction-calling-convention call) :fast))))))))))
+  (if (null form) nil
+      (destructuring-bind (type . code) form
+        (etypecase code
+          (string (let* ((value (llvm:const-string code nil))
+                         (global (llvm:add-global llvm-module (llvm:type-of value) "literal-str")))
+                    (setf (llvm:initializer global) value
+                          (llvm:linkage global) :private
+                          (llvm:global-constant-p global) t)
+                    (llvm:const-in-bounds-gep global
+                                              (mapcar (curry #'llvm:const-int (llvm:int32-type))
+                                                      '(0 0)))))
+          (integer (llvm:const-int (llvm type) code))
+          (real (llvm:const-real (llvm type) code))
+          (value (if (vars (value-type code))
+                     (poly-value-instance code type llvm-module)
+                     (llvm code)))
+          (list
+           (destructuring-bind (op &rest args) code
+             (etypecase op
+               (special-op (apply (special-op-codegen op)
+                                  llvm-module builder type (print args)))
+               (form (let ((argvals (mapcar (curry #'codegen llvm-module builder)
+                                            args)))
+                       (prog1-let (call (llvm:build-call builder (codegen llvm-module builder op)
+                                                         argvals ""))
+                         (setf (llvm:instruction-calling-convention call) :fast)))))))))))
 
 (defun poly-value-instance (poly-value monotype llvm-module)
   (or (assoc-value (instances poly-value) monotype :test #'bl-type=)
