@@ -204,17 +204,19 @@
         (dolist (export exports)
           (if (atom export)
               (push export value-names)
-              (ecase (first export)
-                (type (setf type-names (rest export)))
-                (interface (setf interface-names (rest export))))))
+              (cond
+                ((eq (sym "type") (first export))
+                 (setf type-names (rest export)))
+                ((eq (sym "interface") (first export))
+                 (setf interface-names (rest export)))
+                (t (error "Unrecognized export type ~A" (first export))))))
         (let ((module (make-module name (module env) import-modules
                                    :value-exports value-names
                                    :type-exports type-names
                                    :interface-exports interface-names)))
           (values (list* self (lookup name :value env) import-modules exports)
                   module))))
-    ((declare (ignore name imports exports))
-      (make-form (lookup "unit") (list* self name imports exports)))
+    ((make-form (lookup "unit") (list* self name imports exports)))
     (lmodule builder type
       (declare (ignore builder name exports type))
       (dolist (import imports)
