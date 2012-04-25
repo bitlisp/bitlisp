@@ -312,3 +312,10 @@
               (llvm:build-ret builder (llvm:build-call builder cfunc (llvm:params blfunc) ""))))
           ;; Variable
           (llvm:add-global module (llvm ctype) (name (name name))))))
+
+(defspecial "size-of" self (monotype)
+    (env (list self (type-eval monotype env)))
+    ((make-form (type-eval '("int" 64)) (list self monotype)))
+    (module builder type
+      (declare (ignore module builder type))
+      (llvm:size-of (llvm monotype))))
