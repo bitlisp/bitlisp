@@ -45,7 +45,7 @@
       (when main-unit?
         (multiple-value-bind (var exists?)
             (lookup "main" :value (env module))
-          (assert exists? () "No main bound in ~A" base-module)
+          (assert exists? () "No main bound in ~A" module)
           (compile-main llvm-module var)))
       (llvm:write-bitcode-to-file llvm-module outpath))))
 
