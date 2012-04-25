@@ -319,3 +319,20 @@
     (module builder type
       (declare (ignore module builder type))
       (llvm:size-of (llvm monotype))))
+
+(defspecial "def-type" self (name args type)
+    (env
+      (let* ((subenv (make-subenv env))
+             (tyvars (loop :for arg :in args
+                           :for tyvar := (make-instance 'tyvar)
+                           :do (bind subenv :type arg tyvar)
+                           :collect tyvar)))
+        (bind env :type name
+              (make-instance 'tycon
+                             :name name
+                             :kind (length tyvars)
+                             :llvm (llvm (type-eval type subenv)))))
+      nil)
+    ((declare (ignore name args type)))
+    (m b ty
+      (declare (ignore m b ty name args type))))
