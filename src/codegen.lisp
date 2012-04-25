@@ -40,7 +40,7 @@
                      #'infer-expr
                      (rcurry #'resolve (env module)))
             (rest sexps))
-      (dolist (export (exports module))
+      (dolist (export (value-exports module))
         (setf (llvm:linkage (llvm (lookup export :value (env module)))) :external))
       (when main-unit?
         (multiple-value-bind (var exists?)
