@@ -180,8 +180,11 @@
 (defun type-resolve (code &optional (env *primitives-env*))
   (etypecase code
     (integer code)
-    ((or bl-symbol string) (or (lookup code :type env)
-                               (error "~A names no type binding!" code)))
+    ((or bl-symbol string) (multiple-value-bind (type exists)
+                               (lookup code :type env)
+                             (if exists
+                                 type
+                                 (error "Type ~A is not in scope!" code))))
     (list (let ((ctor (type-resolve (first code) env)))
             (typecase ctor
               (special-tycon (apply (special-tycon-resolver ctor)
