@@ -1,4 +1,6 @@
-(module types (core) (type word byte uword ubyte))
+(module numerics (core comparison)
+        (interface abelian-group ring euclidian-domain division-ring)
+        (type word byte uword ubyte))
 
 (def-type-name word (int 32))
 (def-type-name uword (uint 32))
@@ -6,20 +8,70 @@
 (def-type-name ubyte (uint 8))
 
 (interface abelian-group (a) ()
-  (zero a)
-  (+ (func (* a a) a))
-  (- (func (* a a) a))
-  (negate (func a a)))
+           (zero a)
+           (+ (func (* a a) a))
+           (- (func (* a a) a))
+           (negate (func a a)))
 
 (interface ring (a) ((abelian-group a))
-  (* (func (* a a) a))
-  (one a)
-  (from-word (func word a)))
+           (* (func (* a a) a))
+           (one a)
+           (from-word (func word a)))
 
 (interface euclidian-domain (a) ((ring a))
-  (/ (func (* a a) a))
-  (rem (func (* a a) a)))
+           (/ (func (* a a) a))
+           (rem (func (* a a) a)))
 
 (interface division-ring (a) ((euclidian-domain a))
-  (recip (func a a))
-  (from-float (func float a)))
+           (recip (func a a))
+           (from-float (func float a)))
+
+(implement eq ((forall (a) () (int a))) ()
+           (= int=))
+
+(implement ord ((forall (a) () (int a))) ()
+           (< int<)
+           (<= int<=)
+           (> int>)
+           (>= int>=))
+
+(implement abelian-group ((forall (a) () (int a))) ()
+           (+ int+)
+           (- int-)
+           (zero 0))
+
+(implement ring ((forall (a) () (int a))) ()
+           (* int*)
+           (one 1)
+           (from-int id))
+
+(implement euclidian-domain ((forall (a) () (int a))) ()
+           (/ int/)
+           (rem int-rem))
+
+(implement eq (float) ()
+           (= float=))
+
+(implement ord (float) ()
+           (< float<)
+           (<= float<=)
+           (> float>)
+           (> float>=))
+
+(implement abelian-group (float) ()
+           (+ float+)
+           (- float-)
+           (zero 0))
+
+(implement ring (float) ()
+           (* float*)
+           (one 1)
+           (from-int to-float))
+
+(implement euclidian-domain (float) ()
+           (/ float/)
+           (mod (lambda (x y) 0)))
+
+(implement division-ring (float) ()
+           (recip (lambda (x) (/ 1 x)))
+           (from-rational id))

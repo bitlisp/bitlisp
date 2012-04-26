@@ -1,0 +1,11 @@
+(module comparison (core) (interface eq ord))
+
+(interface eq (a) ()
+  (= (func (* bool a) a))
+  (/= (func (* bool a) a)))
+
+(interface ord (a) ()
+  (<  (func (* bool a) a))
+  (<= (func (* bool a) a))
+  (>  (func (* bool a) a))
+  (>= (func (* bool a) a)))
