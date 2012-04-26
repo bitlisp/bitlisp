@@ -172,7 +172,11 @@
                                               (second op)
                                               (string op)))
                    (a) "bool" ((lhs `(,,type ,a)) (rhs `(,,type ,a))) (builder)
-                 (llvm:build-ret builder (llvm:build-i-cmp builder ,op lhs rhs ""))))))
+                 (llvm:build-ret builder (llvm:build-i-cmp builder
+                                                           ,(if (consp op)
+                                                                (first op)
+                                                                op)
+                                                           lhs rhs ""))))))
 
 (deficmps "int" :> :< := :/= :>= :<=)
 (deficmps "uint" (:unsigned-> ">") (:unsigned-< "<")
