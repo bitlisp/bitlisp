@@ -164,24 +164,60 @@
 (defprimpoly "uint-rem" (a) `("uint" ,a) ((x `("uint" ,a)) (y `("uint" ,a))) (builder)
   (llvm:build-ret (llvm:build-u-rem builder x y "remainder")))
 
-(defmacro deficmps (type &rest ops)
+(defprimpoly "float+" () "float" ((x "float") (y "float")) (builder)
+  (llvm:build-ret (llvm:build-f-add builder x y "sum")))
+
+(defprimpoly "float-" () "float" ((x "float") (y "float")) (builder)
+  (llvm:build-ret (llvm:build-f-sub builder x y "difference")))
+
+(defprimpoly "float*" () "float" ((x "float") (y "float")) (builder)
+  (llvm:build-ret (llvm:build-f-mul builder x y "product")))
+
+(defprimpoly "float/" () "float" ((x "float") (y "float")) (builder)
+  (llvm:build-ret (llvm:build-f-div builder x y "quotient")))
+
+(defprimpoly "float-rem" () "float" ((x "float") (y "float")) (builder)
+  (llvm:build-ret (llvm:build-f-rem builder x y "remainder")))
+
+(defprimpoly "double+" () "double" ((x "double") (y "double")) (builder)
+  (llvm:build-ret (llvm:build-f-add builder x y "sum")))
+
+(defprimpoly "double-" () "double" ((x "double") (y "double")) (builder)
+  (llvm:build-ret (llvm:build-f-sub builder x y "difference")))
+
+(defprimpoly "double*" () "double" ((x "double") (y "double")) (builder)
+  (llvm:build-ret (llvm:build-f-mul builder x y "product")))
+
+(defprimpoly "double/" () "double" ((x "double") (y "double")) (builder)
+  (llvm:build-ret (llvm:build-f-div builder x y "quotient")))
+
+(defprimpoly "double-rem" () "double" ((x "double") (y "double")) (builder)
+  (llvm:build-ret (llvm:build-f-rem builder x y "remainder")))
+
+(defmacro defcmps (vars type func &rest ops)
   (cons 'progn
         (loop :for op :in ops :collect
-              `(defprimpoly ,(concatenate 'string (string-downcase type)
+              `(defprimpoly ,(concatenate 'string (string-downcase
+                                                   (if (consp type)
+                                                       (first type)
+                                                       type))
                                           (if (consp op)
                                               (second op)
                                               (string op)))
-                   (a) "bool" ((lhs `(,,type ,a)) (rhs `(,,type ,a))) (builder)
-                 (llvm:build-ret builder (llvm:build-i-cmp builder
-                                                           ,(if (consp op)
-                                                                (first op)
-                                                                op)
-                                                           lhs rhs ""))))))
+                   ,vars "bool" ((lhs ,type) (rhs ,type)) (builder)
+                 (llvm:build-ret builder (,func builder
+                                                ,(if (consp op)
+                                                     (first op)
+                                                     op)
+                                                lhs rhs ""))))))
 
-(deficmps "int" :> :< := :/= :>= :<=)
-(deficmps "uint" (:unsigned-> ">") (:unsigned-< "<")
+(defcmps (a) `("int" ,a) llvm:build-i-cmp :> :< := :/= :>= :<=)
+(defcmps (a) `("uint" ,a) llvm:build-i-cmp (:unsigned-> ">") (:unsigned-< "<")
   := :/=
   (:unsigned->= ">=") (:unsigned-<= "<="))
+(defcmps () "float" llvm:build-f-cmp  :> :< := :/= :>= :<=)
+(defcmps () "double" llvm:build-f-cmp  :> :< := :/= :>= :<=)
+
 
 (defprimpoly "load" (a) a ((pointer `("ptr" ,a))) (builder)
   (llvm:build-ret builder (llvm:build-load builder pointer "value")))
