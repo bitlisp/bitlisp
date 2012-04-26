@@ -55,18 +55,12 @@
                  subst))))
     (module builder type
       (declare (ignore builder))
-      (prog1-let (func (llvm:add-function module "function" (llvm type)))
-        (setf (llvm:linkage func) :internal
-              (llvm:function-calling-convention func) :fast)
-        (mapc (lambda (param var) (setf (llvm var) param
-                                        (llvm:value-name param) (name (name var))))
-              (llvm:params func) args)
-        (llvm:with-object (local-builder builder)
-          (llvm:position-builder-at-end local-builder
-                                        (llvm:append-basic-block func "entry"))
-          (loop :for (form . rest) :on body
-                :for genned := (codegen module local-builder form)
-                :unless rest :do (llvm:build-ret local-builder genned))))))
+      (with-func (func local-builder module type
+                       :arg-names (mapcar (compose #'name #'name) args))
+        (mapc #'(setf llvm) (llvm:params func) args)
+        (loop :for (form . rest) :on body
+              :for genned := (codegen module local-builder form)
+              :unless rest :do (llvm:build-ret local-builder genned)))))
 
 (defspecial "if" self (condition then else)
     (env
@@ -303,15 +297,14 @@
       (declare (ignore builder return-type))
       (if args
           ;; Function
-          (let* ((cfunc (llvm:add-function module (name (name name)) (llvm ctype)))
-                 (blfunc (llvm:add-function module (var-fqn name) (llvm ctype)))
-                 (entry (llvm:append-basic-block blfunc "entry")))
-            (llvm:add-function-attributes blfunc :inline-hint)
-            (setf (llvm:function-calling-convention blfunc) :fast
-                  (llvm name) blfunc)
-            (llvm:with-object (builder builder)
-              (llvm:position-builder-at-end builder entry)
-              (llvm:build-ret builder (llvm:build-call builder cfunc (llvm:params blfunc) ""))))
+          (let ((cfunc (llvm:add-function module (name (name name))
+                                          (llvm ctype))))
+            (with-func (blfunc inner-builder module ctype
+                               :attributes '(:inline-hint))
+              (setf (llvm name) blfunc)
+              (llvm:build-ret inner-builder
+                              (llvm:build-call inner-builder
+                                               cfunc (llvm:params blfunc) ""))))
           ;; Variable
           (llvm:add-global module (llvm ctype) (name (name name))))))
 

@@ -23,3 +23,21 @@
                 (push item matches)
                 (push item failures))
         :finally (return (values matches failures))))
+
+(defun build-func (module type &key (name "function") arg-names (linkage :internal) (calling-convention :fast) attributes)
+  (let ((func (llvm:add-function module name (llvm type))))
+    (setf (llvm:function-calling-convention func) calling-convention)
+    (setf (llvm:linkage func) linkage)
+    (when attributes
+     (apply #'llvm:add-function-attributes func attributes))
+    (mapc #'(setf llvm:value-name) arg-names (llvm:params func))))
+
+(defmacro with-func ((func-var builder-var module type &rest keys &key (name "function") arg-names (linkage :internal) (calling-convention :fast) attributes) &body body)
+  "Executes BODY with FUNC-VAR bound to a new function of type TYPE and BUILDER-VAR bound to a new instruction builder positioned at the end of its entry block. Returns the function handle."
+  (declare (ignore name arg-names linkage calling-convention attributes))
+  `(llvm:with-object (,builder-var builder)
+     (let ((,func-var (build-func ,module ,type ,@keys)))
+       (llvm:position-builder-at-end ,builder-var
+                                     (llvm:append-basic-block ,func-var "entry"))
+       ,@body
+       ,func-var)))

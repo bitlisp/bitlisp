@@ -80,20 +80,12 @@
                                    :name ,symbol
                                    :value-type ,type)))
        (push (cons ,value (lambda (,bl-module ,module)
-                            (prog1-let (,func (llvm:add-function module
-                                                                 (symbol-fqn ,bl-module
-                                                                             (make-bl-symbol ,name))
-                                                                 (llvm ,type)))
-                              (setf (llvm:function-calling-convention ,func) :fast)
-                              (mapc #'(setf llvm:value-name)
-                                    ',(mapcar (compose #'string-downcase #'first) args)
-                                    (llvm:params ,func))
-                              (llvm:with-object (,builder builder)
-                                (llvm:position-builder-at-end builder
-                                                              (llvm:append-basic-block ,func "entry"))
-                                (destructuring-bind ,(mapcar #'first args)
-                                    (llvm:params ,func)
-                                  ,@llvm)))))
+                            (with-func (,func ,builder ,module ,type
+                                        :name (symbol-fqn ,bl-module ,symbol)
+                                        :arg-names ',(mapcar (compose #'string-downcase #'first) args))
+                              (destructuring-bind ,(mapcar #'first args)
+                                  (llvm:params ,func)
+                                ,@llvm))))
              *primfun-builders*)
        (bind *primitives-env* :value ,symbol ,value))))
 
@@ -133,11 +125,14 @@
               (destructuring-bind ,vars ,qvars
                 (declare (ignorable ,@vars))
                (lambda (,inst-type ,module)
-                 (prog1-let (,func (llvm:add-function ,module (concatenate 'string (module-fqn nil) (string +module-separator+) ,name ":" (princ-to-string ,type)) (llvm ,inst-type)))
-                   (llvm:with-object (,builder builder)
-                     (llvm:position-builder-at-end ,builder (llvm:append-basic-block ,func "entry"))
-                     (destructuring-bind ,(mapcar #'first args) (llvm:params ,func)
-                       ,@instantiator))))))))))
+                 (with-func (,func ,builder ,module ,inst-type
+                             :name (concatenate 'string
+                                                (symbol-fqn nil ,sym)
+                                                ":"
+                                                (princ-to-string ,inst-type))
+                             :linkage :link-once-odr)
+                   (destructuring-bind ,(mapcar #'first args) (llvm:params ,func)
+                     ,@instantiator)))))))))
 
 (defprimpoly "int+" (a) `("int" ,a) ((x `("int" ,a)) (y `("int" ,a))) (builder)
   (llvm:build-ret (llvm:build-add builder x y "sum")))

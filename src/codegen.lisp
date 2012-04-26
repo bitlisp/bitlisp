@@ -56,17 +56,14 @@
            ()
            "main is of inappropriate type ~A (should be ~A)"
            (value-type internal-main) ftype)
-    (llvm:with-objects ((builder builder))
-      (let* ((main (llvm:add-function llvm-module "main" (llvm ftype)))
-             (entry (llvm:append-basic-block main "entry"))
-             (params (llvm:params main)))
-        (setf (llvm:value-name (first params)) "argc"
-              (llvm:value-name (second params)) "argv")
-        (llvm:position-builder-at-end builder entry)
-        (let ((call (llvm:build-call builder (llvm internal-main) (llvm:params main)
-                                     "")))
-          (setf (llvm:instruction-calling-convention call) :fast)
-          (llvm:build-ret builder call))))))
+    (with-func (main builder llvm-module (llvm ftype)
+                     :name "main"
+                     :arg-names '("argc" "argv")
+                     :calling-convention :c)
+      (let ((call (llvm:build-call builder (llvm internal-main) (llvm:params main)
+                                   "")))
+        (setf (llvm:instruction-calling-convention call) :fast)
+        (llvm:build-ret builder call)))))
 
 (defun codegen (llvm-module builder form)
   (if (null form) nil
