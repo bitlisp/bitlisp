@@ -169,15 +169,20 @@
 (defprimpoly "uint-rem" (a) `("uint" ,a) ((x `("uint" ,a)) (y `("uint" ,a))) (builder)
   (llvm:build-ret (llvm:build-u-rem builder x y "remainder")))
 
-(defmacro deficmps (types &rest ops)
+(defmacro deficmps (type &rest ops)
   (cons 'progn
-        (loop :for type :in types :nconc
-          (loop :for op :in ops :collect
-                `(defprimpoly ,(concatenate 'string (string-downcase type) (string op))
-                     (a) "bool" ((lhs `(,,type ,a)) (rhs `(,,type ,a))) (builder)
-                   (llvm:build-ret builder (llvm:build-i-cmp builder ,op lhs rhs "")))))))
+        (loop :for op :in ops :collect
+              `(defprimpoly ,(concatenate 'string (string-downcase type)
+                                          (if (consp op)
+                                              (second op)
+                                              (string op)))
+                   (a) "bool" ((lhs `(,,type ,a)) (rhs `(,,type ,a))) (builder)
+                 (llvm:build-ret builder (llvm:build-i-cmp builder ,op lhs rhs ""))))))
 
-(deficmps ("int" "uint") :> :< := :/= :>= :<=)
+(deficmps "int" :> :< := :/= :>= :<=)
+(deficmps "uint" (:unsigned-> ">") (:unsigned-< "<")
+  := :/=
+  (:unsigned->= ">=") (:unsigned-<= "<="))
 
 (defprimpoly "load" (a) a ((pointer `("ptr" ,a))) (builder)
   (llvm:build-ret builder (llvm:build-load builder pointer "value")))
