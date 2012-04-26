@@ -193,3 +193,6 @@
 (defprimpoly "vector-elt" (ty size) ty ((vector `("vector" ,ty ,size)) (index '("int" 32))) (builder)
   ;; TODO: Optional bounds checking
   (llvm:build-extract-element builder vector index ""))
+
+(defprimpoly "bitcast" (a b) b ((x a)) (builder)
+  (llvm:build-bit-cast builder x (llvm b) ""))
