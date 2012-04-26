@@ -130,12 +130,14 @@
               :env *primitives-env*
               :name ,sym
               :llvm
-              (lambda (,inst-type ,module)
-                (prog1-let (,func (llvm:add-function ,module (concatenate 'string (module-fqn nil) (string +module-separator+) ,name ":" (princ-to-string ,type)) (llvm ,inst-type)))
-                  (llvm:with-object (,builder builder)
-                    (llvm:position-builder-at-end ,builder (llvm:append-basic-block ,func "entry"))
-                    (destructuring-bind ,(mapcar #'first args) (llvm:params ,func)
-                      ,@instantiator)))))))))
+              (destructuring-bind ,vars ,qvars
+                (declare (ignorable ,@vars))
+               (lambda (,inst-type ,module)
+                 (prog1-let (,func (llvm:add-function ,module (concatenate 'string (module-fqn nil) (string +module-separator+) ,name ":" (princ-to-string ,type)) (llvm ,inst-type)))
+                   (llvm:with-object (,builder builder)
+                     (llvm:position-builder-at-end ,builder (llvm:append-basic-block ,func "entry"))
+                     (destructuring-bind ,(mapcar #'first args) (llvm:params ,func)
+                       ,@instantiator))))))))))
 
 (defprimpoly "int+" (a) `("int" ,a) ((x `("int" ,a)) (y `("int" ,a))) (builder)
   (llvm:build-ret (llvm:build-add builder x y "sum")))
