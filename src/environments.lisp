@@ -26,7 +26,7 @@
     (:type (type-bindings env))
     (:interface (interface-bindings env))))
 
-(defun lookup (symbol &optional (namespace :value) (env *primitives-env*))
+(defun %lookup (symbol &optional (namespace :value) (env *primitives-env*))
   (when (stringp symbol)
     (setf symbol (make-bl-symbol symbol)))
   (if env
@@ -34,10 +34,15 @@
         (if exists
             (values place t)
             (loop for parent in (parents env)
-                  do (multiple-value-bind (place exists) (lookup symbol namespace parent)
+                  do (multiple-value-bind (place exists) (%lookup symbol namespace parent)
                        (when exists
                            (return (values place t)))))))
       (values nil nil)))
+
+(defun lookup (symbol &optional (namespace :value) (env *primitives-env*))
+  (multiple-value-bind (binding exists) (%lookup symbol namespace env)
+    (if exists binding
+        (error "~A names no ~A in ~A" symbol namespace env))))
 
 (defun bind (env namespace symbol value)
   "Associate SYMBOL with VALUE in ENV"
@@ -56,11 +61,7 @@
   "Lower code into internal representations"
   (etypecase source
     (null nil)
-    (bl-symbol
-     (multiple-value-bind (place exists) (lookup source :value env)
-       (if exists
-	   place
-	   (error "~A names no binding" source))))
+    (bl-symbol (lookup source :value env))
     (list
      (destructuring-bind (operator &rest args) source
        (let ((op (resolve operator env)))
