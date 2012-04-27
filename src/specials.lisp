@@ -284,13 +284,14 @@
              (var (make-instance 'value
                                  :name name
                                  :env env
-                                 :value-type (if args
-                                                 (apply #'make-ftype
-                                                        (apply #'make-prodty
-                                                               (mapcar #'second
-                                                                       typed-args))
+                                 :value-type (to-scheme
+                                              (if args
+                                                  (apply #'make-ftype
+                                                         (apply #'make-prodty
+                                                                (mapcar #'second
+                                                                        typed-args))
                                                          rtype)
-                                                 (tyapply (lookup "ptr") return-type)))))
+                                                  (tyapply (lookup "ptr") return-type))))))
         (bind env :value name var)
         (list* self var rtype typed-args)))
     ((make-form (value-type name)
