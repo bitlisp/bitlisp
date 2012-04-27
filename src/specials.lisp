@@ -39,20 +39,18 @@
                                      :toplevel? nil
                                      :module (module env)))
              (arg-vars (mapcar (lambda (sym)
-                                 (make-instance 'value :name sym :env new-env))
+                                 (make-instance 'value :name sym :env new-env
+                                                :value-type (to-scheme (make-instance 'tyvar :kind 1))))
                                args)))
         (mapc (curry #'bind new-env :value) args arg-vars)
         (list* self arg-vars
                (mapcar (rcurry #'resolve new-env) body))))
-    ((let ((arg-types (loop :repeat (length args) :collect (make-instance 'tyvar :kind 1))))
-       (mapc (lambda (arg ty) (setf (value-type arg) (to-scheme ty)))
-             args arg-types)
-       (multiple-value-bind (forms preds subst) (infer-expr-seq body)
-         (values (make-form (make-ftype (apply #'make-prodty arg-types)
-                                        (form-type (lastcar forms)))
-                            (list* self args forms))
-                 preds
-                 subst))))
+    ((multiple-value-bind (forms preds subst) (infer-expr-seq body)
+       (values (make-form (make-ftype (apply #'make-prodty (mapcar (compose #'fresh-instance #'value-type) args))
+                                      (form-type (lastcar forms)))
+                          (list* self args forms))
+               preds
+               subst)))
     (module builder type
       (declare (ignore builder))
       (with-func (func local-builder module type
