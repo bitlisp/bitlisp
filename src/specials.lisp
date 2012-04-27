@@ -20,6 +20,10 @@
     ((declare (ignore vars))
      (values (type-construct type) constraints)))
 
+(def-type-special "type-of" self (value)
+    (env (list self (resolve value env)))
+    ((form-type (infer-expr value))))
+
 (defmacro defspecial (name self (&rest args)
                       (env &body resolver)
                       (&body inferrer)
