@@ -11,6 +11,10 @@
    (module :initform nil :initarg :module :accessor module)
    (toplevel? :initarg :toplevel? :accessor toplevel?)))
 
+(defmethod print-object ((env environment) stream)
+  (print-unreadable-object (env stream :type t)
+    (princ (module-fqn (module env)) stream)))
+
 (defun make-subenv (parent)
   (make-instance 'environment
                  :parents (list parent)
