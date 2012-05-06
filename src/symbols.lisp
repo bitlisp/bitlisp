@@ -26,6 +26,6 @@
 
 (defun ensure-bl-sym (thing)
   (etypecase thing
-    (symbol (ensure-bl-sym (string thing)))
+    (symbol (ensure-bl-sym (string-downcase thing)))
     (string (make-bl-symbol thing))
     (bl-symbol thing)))
