@@ -96,7 +96,9 @@
 (defun poly-value-instance (poly-value monotype llvm-module)
   (or (assoc-value (instances poly-value) monotype :test #'bl-type=)
       (setf (assoc-value (instances poly-value) monotype :test #'bl-type=)
-            (if (typep poly-value 'prim-poly-value)
-                (funcall (llvm poly-value) monotype llvm-module)
-                (codegen llvm-module nil
-                         (specialize-form (form poly-value) monotype))))))
+            (prog1-let (value (if (typep poly-value 'prim-poly-value)
+                                  (funcall (llvm poly-value) monotype llvm-module)
+                                  (codegen llvm-module nil
+                                           (specialize-form (make-form (value-type poly-value) (code poly-value))
+                                                            monotype))))
+              (setf (llvm:value-name value) (poly-instance-fqn value monotype))))))

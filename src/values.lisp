@@ -25,6 +25,13 @@
   (print-unreadable-object (value stream :type t)
     (princ (name value) stream)))
 
+(defclass prim-poly-value (value) ()
+  (:documentation "Like a regular value, except the llvm slot holds a function that takes an LLVM module and the instantiation type"))
+
+(defclass interface-value (value)
+  ((interface :initarg :interface :reader interface)
+   (candidates :initarg :candidates :reader candidates)))
+
 (deftype form () 'cons)
 
 (defun make-form (type code)

@@ -30,6 +30,10 @@
                    "|")                 ;TODO: Named function envs
                (name (name var))))
 
+(defun poly-instance-fqn (value type)
+  (concatenate 'string (var-fqn value) ":" (with-output-to-string (s)
+                                             (print type s))))
+
 (defmethod print-object ((module module) stream)
   (print-unreadable-object (module stream :type t)
     (princ (module-fqn module) stream)))

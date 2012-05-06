@@ -64,170 +64,89 @@
         (nconc (flatten-product l) (flatten-product r)))
       (list product)))
 
-(defparameter *primfun-builders* nil)
+(defun add-prim (name scheme llvm)
+  (bind *primitives-env* :value name
+        (make-instance (if (vars scheme)
+                           'prim-poly-value
+                           'value)
+                       :name name
+                       :value-type scheme
+                       :env *primitives-env*
+                       :llvm llvm)))
 
-(defun build-primfuns (bl-module llvm-module)
-  (mapc (lambda (pair)
-          (setf (llvm (car pair)) (funcall (cdr pair) bl-module llvm-module)))
-        *primfun-builders*))
+(defmacro def-prim (name type (instance-type module) &body body)
+  `(add-prim (make-bl-symbol ,name) (multiple-value-bind (ty preds)
+                                        (type-eval ',type)
+                                      (quantify (free-vars ty) preds ty))
+             (lambda (,instance-type ,module) ,@body)))
 
-(defmacro defprimfun (name rtype args (module builder type) &body llvm)
-  (with-gensyms (symbol func value bl-module)
-    `(let* ((,symbol (make-bl-symbol ,name))
-            (,type (make-ftype (make-prodty ,@(mapcar (compose (curry #'list 'lookup) #'second) args))
-                               (lookup ,rtype)))
-            (,value (make-instance 'value
-                                   :name ,symbol
-                                   :value-type ,type)))
-       (push (cons ,value (lambda (,bl-module ,module)
-                            (with-func (,func ,builder ,module ,type
-                                        :name (symbol-fqn ,bl-module ,symbol)
-                                        :arg-names ',(mapcar (compose #'string-downcase #'first) args))
-                              (destructuring-bind ,(mapcar #'first args)
-                                  (llvm:params ,func)
-                                ,@llvm))))
-             *primfun-builders*)
-       (bind *primitives-env* :value ,symbol ,value))))
+(defmacro def-binop (name tyvars arg-type return-type builder)
+  `(def-prim ,name ("forall" ,tyvars ()
+                             ("func" ("*" ,arg-type ,arg-type) ,return-type))
+       (type module)
+     (with-func (func builder module type)
+       (destructuring-bind (left right) (llvm:params func)
+         (llvm:build-ret builder (,builder builder left right ""))))))
 
-(defmacro defprimpoly (name vars return-type args (builder) &body instantiator)
-  (with-gensyms (module sym type qvars subenv func inst-type)
-    `(let* ((,sym (make-bl-symbol ,name))
-            (n 0)
-            (,qvars (mapcar (lambda (v)
-                              (declare (ignore v))
-                              (make-instance 'tygen
-                                             :number (prog1 n (incf n))
-                                             :kind 1))
-                            ',vars))
-            (,type (let ((,subenv (make-subenv *primitives-env*)))
-                     (loop :for name :in ',(mapcar #'string vars)
-                           :for qvar :in ,qvars
-                           :do (bind ,subenv :type name qvar))
-                     (destructuring-bind ,vars ',(mapcar #'string vars)
-                       (make-instance
-                        'scheme
-                        :vars ,qvars
-                        :inner-type
-                        (make-instance
-                         'tyqual
-                         :context nil
-                         :head 
-                         (tyapply (lookup "func" :type)
-                                  (apply #'make-prodty (mapcar (rcurry #'type-eval ,subenv) (list ,@(mapcar #'second args))))
-                                  (type-eval ,return-type ,subenv))))))))
-       (bind *primitives-env* :value ,sym
-             (make-instance
-              'prim-poly-value
-              :value-type ,type
-              :env *primitives-env*
-              :name ,sym
-              :llvm
-              (destructuring-bind ,vars ,qvars
-                (declare (ignorable ,@vars))
-               (lambda (,inst-type ,module)
-                 (with-func (,func ,builder ,module ,inst-type
-                             :name (concatenate 'string
-                                                (symbol-fqn nil ,sym)
-                                                ":"
-                                                (princ-to-string ,inst-type))
-                             :linkage :link-once-odr)
-                   (destructuring-bind ,(mapcar #'first args) (llvm:params ,func)
-                     ,@instantiator)))))))))
+(def-binop "int+" ("a") ("int" "a") ("int" "a") llvm:build-add)
+(def-binop "int-" ("a") ("int" "a") ("int" "a") llvm:build-sub)
+(def-binop "int/" ("a") ("int" "a") ("int" "a") llvm:build-s-div)
+(def-binop "int-rem" ("a") ("int" "a") ("int" "a") llvm:build-s-rem)
 
-(defprimpoly "int+" (a) `("int" ,a) ((x `("int" ,a)) (y `("int" ,a))) (builder)
-  (llvm:build-ret (llvm:build-add builder x y "sum")))
+(def-binop "uint+" ("a") ("uint" "a") ("uint" "a") llvm:build-add)
+(def-binop "uint-" ("a") ("uint" "a") ("uint" "a") llvm:build-sub)
+(def-binop "uint/" ("a") ("uint" "a") ("uint" "a") llvm:build-u-div)
+(def-binop "uint-rem" ("a") ("uint" "a") ("uint" "a") llvm:build-u-rem)
 
-(defprimpoly "int-" (a) `("int" ,a) ((x `("int" ,a)) (y `("int" ,a))) (builder)
-  (llvm:build-ret (llvm:build-sub builder x y "difference")))
+(def-binop "float+" () "float" "float" llvm:build-f-add)
+(def-binop "float-" () "float" "float" llvm:build-f-sub)
+(def-binop "float/" () "float" "float" llvm:build-f-div)
+(def-binop "float-rem" () "float" "float" llvm:build-f-rem)
 
-(defprimpoly "int*" (a) `("int" ,a) ((x `("int" ,a)) (y `("int" ,a))) (builder)
-  (llvm:build-ret (llvm:build-mul builder x y "product")))
-
-(defprimpoly "int/" (a) `("int" ,a) ((x `("int" ,a)) (y `("int" ,a))) (builder)
-  (llvm:build-ret (llvm:build-s-div builder x y "quotient")))
-
-(defprimpoly "int-rem" (a) `("int" ,a) ((x `("int" ,a)) (y `("int" ,a))) (builder)
-  (llvm:build-ret (llvm:build-s-rem builder x y "remainder")))
-
-(defprimpoly "uint+" (a) `("uint" ,a) ((x `("uint" ,a)) (y `("uint" ,a))) (builder)
-  (llvm:build-ret (llvm:build-add builder x y "sum")))
-
-(defprimpoly "uint-" (a) `("uint" ,a) ((x `("uint" ,a)) (y `("uint" ,a))) (builder)
-  (llvm:build-ret (llvm:build-sub builder x y "difference")))
-
-(defprimpoly "uint*" (a) `("uint" ,a) ((x `("uint" ,a)) (y `("uint" ,a))) (builder)
-  (llvm:build-ret (llvm:build-mul builder x y "product")))
-
-(defprimpoly "uint/" (a) `("uint" ,a) ((x `("uint" ,a)) (y `("uint" ,a))) (builder)
-  (llvm:build-ret (llvm:build-u-div builder x y "quotient")))
-
-(defprimpoly "uint-rem" (a) `("uint" ,a) ((x `("uint" ,a)) (y `("uint" ,a))) (builder)
-  (llvm:build-ret (llvm:build-u-rem builder x y "remainder")))
-
-(defprimpoly "float+" () "float" ((x "float") (y "float")) (builder)
-  (llvm:build-ret (llvm:build-f-add builder x y "sum")))
-
-(defprimpoly "float-" () "float" ((x "float") (y "float")) (builder)
-  (llvm:build-ret (llvm:build-f-sub builder x y "difference")))
-
-(defprimpoly "float*" () "float" ((x "float") (y "float")) (builder)
-  (llvm:build-ret (llvm:build-f-mul builder x y "product")))
-
-(defprimpoly "float/" () "float" ((x "float") (y "float")) (builder)
-  (llvm:build-ret (llvm:build-f-div builder x y "quotient")))
-
-(defprimpoly "float-rem" () "float" ((x "float") (y "float")) (builder)
-  (llvm:build-ret (llvm:build-f-rem builder x y "remainder")))
-
-(defprimpoly "double+" () "double" ((x "double") (y "double")) (builder)
-  (llvm:build-ret (llvm:build-f-add builder x y "sum")))
-
-(defprimpoly "double-" () "double" ((x "double") (y "double")) (builder)
-  (llvm:build-ret (llvm:build-f-sub builder x y "difference")))
-
-(defprimpoly "double*" () "double" ((x "double") (y "double")) (builder)
-  (llvm:build-ret (llvm:build-f-mul builder x y "product")))
-
-(defprimpoly "double/" () "double" ((x "double") (y "double")) (builder)
-  (llvm:build-ret (llvm:build-f-div builder x y "quotient")))
-
-(defprimpoly "double-rem" () "double" ((x "double") (y "double")) (builder)
-  (llvm:build-ret (llvm:build-f-rem builder x y "remainder")))
+(def-binop "double+" () "double" "double" llvm:build-f-add)
+(def-binop "double-" () "double" "double" llvm:build-f-sub)
+(def-binop "double/" () "double" "double" llvm:build-f-div)
+(def-binop "double-rem" () "double" "double" llvm:build-f-rem)
 
 (defmacro defcmps (vars type func &rest ops)
   (cons 'progn
         (loop :for op :in ops :collect
-              `(defprimpoly ,(concatenate 'string (string-downcase
+              `(def-binop ,(concatenate 'string (string-downcase
                                                    (if (consp type)
                                                        (first type)
                                                        type))
-                                          (if (consp op)
-                                              (second op)
-                                              (string op)))
-                   ,vars "bool" ((lhs ,type) (rhs ,type)) (builder)
-                 (llvm:build-ret builder (,func builder
-                                                ,(if (consp op)
-                                                     (first op)
-                                                     op)
-                                                lhs rhs ""))))))
+                                        (if (consp op)
+                                            (second op)
+                                            (string op)))
+                   ,vars ,type "bool"
+                 (lambda (builder left right name)
+                   (,func builder ,(if (consp op)
+                                       (first op)
+                                       op)
+                          left right name))))))
 
-(defcmps (a) `("int" ,a) llvm:build-i-cmp :> :< := :/= :>= :<=)
-(defcmps (a) `("uint" ,a) llvm:build-i-cmp (:unsigned-> ">") (:unsigned-< "<")
+(defcmps ("a") ("int" "a") llvm:build-i-cmp :> :< := :/= :>= :<=)
+(defcmps ("a") ("uint" "a") llvm:build-i-cmp (:unsigned-> ">") (:unsigned-< "<")
   := :/=
   (:unsigned->= ">=") (:unsigned-<= "<="))
 (defcmps () "float" llvm:build-f-cmp  :> :< := :/= :>= :<=)
 (defcmps () "double" llvm:build-f-cmp  :> :< := :/= :>= :<=)
 
+(def-prim "load" ("forall" ("a") () ("func" ("ptr" "a") "a")) (type module)
+  (with-func (func builder module type)
+    (llvm:build-ret builder (llvm:build-load builder (first (llvm:params func)) ""))))
+(def-prim "store" ("forall" ("a") () ("func" ("*" ("ptr" "a") "a") "a")) (type module)
+  (with-func (func builder module type)
+    (destructuring-bind (pointer value) (llvm:params func)
+      (llvm:build-store builder value pointer)
+      (llvm:build-ret builder value))))
 
-(defprimpoly "load" (a) a ((pointer `("ptr" ,a))) (builder)
-  (llvm:build-ret builder (llvm:build-load builder pointer "value")))
-(defprimpoly "store" (a) a ((pointer `("ptr" ,a)) (value a)) (builder)
-  (llvm:build-store builder value pointer)
-  (llvm:build-ret builder value))
+;;; TODO: s/(int 32)/word/
+(def-prim "vector-elt" ("forall" ("ty" "size") () ("func" ("*" ("vector" "ty" "size") ("int" 32)) "ty")) (type module)
+  (with-func (func builder module type)
+    (destructuring-bind (vector index) (llvm:params func)
+      (llvm:build-ret builder (llvm:build-extract-element builder vector index "")))))
 
-(defprimpoly "vector-elt" (ty size) ty ((vector `("vector" ,ty ,size)) (index '("int" 32))) (builder)
-  ;; TODO: Optional bounds checking
-  (llvm:build-ret builder (llvm:build-extract-element builder vector index "")))
-
-(defprimpoly "bitcast" (a b) b ((x a)) (builder)
-  (llvm:build-ret builder (llvm:build-bit-cast builder x (llvm b) "")))
+(def-prim "bitcast" ("forall" ("a" "b") () ("func" "a" "b")) (type module)
+  (with-func (func builder module type)
+    (llvm:build-ret builder (llvm:build-bit-cast builder (first (llvm:params func)) (llvm (second (args type))) ""))))
