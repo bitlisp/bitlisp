@@ -15,7 +15,7 @@
                     :outpath bc
                     :main-unit? t)
       (with-tmp-file (core "bitlisp-core-")
-        (llvm:with-object (core-module module ":core")
+        (llvm:with-object (core-module module ".core")
           (build-primfuns (lookup "core" :value (env root-module)) core-module)
           (llvm:write-bitcode-to-file core-module core))
         (ccl:run-program "llvm-link" (list "-o" bc core bc)
