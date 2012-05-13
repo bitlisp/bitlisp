@@ -31,8 +31,7 @@
     (:interface (interface-bindings env))))
 
 (defun %lookup (symbol &optional (namespace :value) (env *primitives-env*))
-  (when (stringp symbol)
-    (setf symbol (make-bl-symbol symbol)))
+  (setf symbol (ensure-bl-sym symbol))
   (if env
       (multiple-value-bind (place exists) (gethash symbol (env-bindings env namespace))
         (if exists

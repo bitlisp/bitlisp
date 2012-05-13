@@ -180,7 +180,7 @@
 (defun type-resolve (code &optional (env *primitives-env*))
   (etypecase code
     (integer code)
-    ((or bl-symbol string) (lookup code :type env))
+    ((or symbol bl-symbol string) (lookup code :type env))
     (list (let ((ctor (type-resolve (first code) env)))
             (typecase ctor
               (special-tycon (apply (special-tycon-resolver ctor)
