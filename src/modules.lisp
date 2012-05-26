@@ -51,7 +51,10 @@
       (dolist (sym (interface-exports import))
         (bind menv :interface sym (lookup sym :interface (env import))))
       (dolist (sym (type-exports import))
-        (bind menv :type sym (lookup sym :type (env import)))))
+        (bind menv :type sym (lookup sym :type (env import))))
+      (dolist (implset (implementations (env import)))
+        (push (cdr implset)
+              (assoc-value (implementations menv) (car implset)))))
     (prog1-let (mod (make-instance
                      'module
                      :name name

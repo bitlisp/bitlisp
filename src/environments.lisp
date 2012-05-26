@@ -7,6 +7,8 @@
                   :initarg :type-bindings :reader type-bindings)
    (interface-bindings :initform (make-hash-table :test 'eq)
                        :initarg :interface-bindings :reader interface-bindings)
+   (implementations :initform nil :accessor implementations
+                    :documentation "((interface . (impl1 impl2 ...)) ...) alist")
    (parents :initform () :initarg :parents :accessor parents)
    (module :initform nil :initarg :module :accessor module)
    (toplevel? :initarg :toplevel? :accessor toplevel?)))
@@ -73,3 +75,8 @@
 	   (special-op (apply (special-op-resolver op) env args))
 	   (t (cons op (mapcar (rcurry #'resolve env) args)))))))
     ((or string integer single-float double-float) source)))
+
+(defun lookup-implementations (interface env)
+  (or (assoc-value (implementations env) interface :test #'eq)
+      (some (curry #'lookup-implementations interface) (parents env))
+      (error "~A is not implemented in ~A")))

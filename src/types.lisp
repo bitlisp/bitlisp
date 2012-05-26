@@ -419,3 +419,10 @@
     (let* ((var-form (instantiate-form vars poly-form))
            (subst (unify (form-type var-form) monotype)))
       (subst-code subst var-form))))
+
+(defclass implementation ()
+  ((interface :initarg :interface :reader interface)
+   (predicate :initarg :predicate :reader predicate
+              :documentation "Qualified predicate describing the context (if any) and interface params corresponding to the implementation")
+   (bindings :initarg :bindings :reader bindings
+             :documentation "Value bindings implemented, corresponding to those prototyped by the interface")))
