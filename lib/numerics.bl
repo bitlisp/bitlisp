@@ -26,52 +26,52 @@
            (recip (func a a))
            (from-float (func float a)))
 
-(implement eq ((forall (a) () (int a))) ()
+(implement (a) () (eq (int a))
            (= int=))
 
-(implement ord ((forall (a) () (int a))) ()
+(implement (a) () (ord (int a))
            (< int<)
            (<= int<=)
            (> int>)
            (>= int>=))
 
-(implement abelian-group ((forall (a) () (int a))) ()
+(implement (a) () (abelian-group (int a))
            (+ int+)
            (- int-)
            (zero 0))
 
-(implement ring ((forall (a) () (int a))) ()
+(implement (a) () (ring (int a))
            (* int*)
            (one 1)
            (from-int id))
 
-(implement euclidian-domain ((forall (a) () (int a))) ()
+(implement (a) () (euclidian-domain (int a))
            (/ int/)
            (rem int-rem))
 
-(implement eq (float) ()
+(implement () () (eq float)
            (= float=))
 
-(implement ord (float) ()
+(implement () () (ord float)
            (< float<)
            (<= float<=)
            (> float>)
            (> float>=))
 
-(implement abelian-group (float) ()
+(implement () () (abelian-group float)
            (+ float+)
            (- float-)
            (zero 0))
 
-(implement ring (float) ()
+(implement () () (ring float)
            (* float*)
            (one 1)
            (from-int to-float))
 
-(implement euclidian-domain (float) ()
+(implement () () (euclidian-domain float)
            (/ float/)
            (mod (lambda (x y) 0)))
 
-(implement division-ring (float) ()
+(implement () () (division-ring float)
            (recip (lambda (x) (/ 1 x)))
            (from-rational id))
