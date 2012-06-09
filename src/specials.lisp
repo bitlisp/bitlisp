@@ -65,7 +65,7 @@
             (mapcar (rcurry #'resolve new-env) body))))
   (:infer
    (multiple-value-bind (forms preds subst) (infer-expr-seq body)
-     (values (make-form (make-ftype (apply #'make-prodty (mapcar (compose #'fresh-instance #'value-type) args))
+     (values (make-form (make-ftype (apply #'make-prodty (mapcar (compose #'head #'fresh-instance #'value-type) args))
                                     (form-type (lastcar forms)))
                         (list* self args forms))
              preds
