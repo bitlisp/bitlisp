@@ -45,7 +45,7 @@
                 ((:infer &body body)
                  `((special-op-inferrer ,self) (lambda (,@args) ,@body)))
                 ((:codegen (module builder complete-type) &body body)
-                 `((special-op-inferrer ,self)
+                 `((special-op-codegen ,self)
                    (lambda (,module ,builder ,complete-type ,@args) ,@body))))))
      (bind *primitives-env* :value (make-bl-symbol ,name) ,self)))
 
