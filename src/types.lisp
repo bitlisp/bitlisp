@@ -223,10 +223,10 @@
    (supers :initarg :supers :reader supers
            :documentation "List of predicates on signature vars")
    (vars :initarg :vars :reader vars
-         :documentation "List of vars paramterized on")
-   (implementations :initarg :implementations :accessor implementations
-                    :initform nil
-                    :documentation "List of qualified predicates")))
+         :documentation "List of vars paramterized on")))
+
+(defun implementations (interface env)
+  (mapcar #'predicate (lookup-implementations interface env)))
 
 (defmethod kind ((interface interface))
   (length (vars interface)))
@@ -234,21 +234,6 @@
 (defmethod print-object ((i interface) stream)
   (print-unreadable-object (i stream :type t)
     (princ (name i) stream)))
-
-(defun add-impl (interface predicates &rest params)
-  (check-type interface interface)
-  (unless (= (kind interface) (length params))
-    (error "Implementation has wrong kind (~A) to implement ~A (kind ~A)"
-           (length params) interface (kind interface)))
-  (let ((pred (make-instance 'pred
-                             :interface interface
-                             :args params)))
-    (when (some (curry #'preds-overlap pred)
-                (mapcar #'head (implementations interface))))
-    (push (make-instance 'tyqual
-                         :context predicates
-                         :head pred)
-          (implementations interface))))
 
 (defun preds-overlap (a b)
   (handler-case (unify a b)
