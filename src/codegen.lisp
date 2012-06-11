@@ -8,7 +8,7 @@
 ;;                      does internally
 ;; 01:27:31 < nicholas> you can pass it the list of functions via
 ;;                      -internalize-public-api-{file,list}=...
-(defun compile-full (sexps &key (outpath "./bitlisp.s") (speed 3) (assemble t))
+(defun compile-full (sexps &key (outpath "./bitlisp.o") (speed 3) (format :object))
   (let ((root-module (make-root)))
     (with-tmp-file (bc "bitlisp-")
       (compile-unit sexps root-module
@@ -21,11 +21,16 @@
         (ccl:run-program "llvm-link" (list "-o" bc core bc)
                          :output *standard-output* :error *error-output*))
       (let ((opt (format nil "-O~D" speed)))
-        (ccl:run-program "opt" (list opt "-o" (if assemble bc outpath) bc
+        (ccl:run-program "opt" (list opt "-o" (if (eq format :ir) outpath bc) bc
                                      "-std-link-opts")
                          :output *standard-output* :error *error-output*)
-        (when assemble
-          (ccl:run-program "llc" (list opt "-o" outpath bc)
+        (unless (eq format :ir)
+          (ccl:run-program "llc" (list opt
+                                       "-o" outpath
+                                       (ecase format
+                                         (:object "-filetype=obj")
+                                         (:assembly "-filetype=asm"))
+                                       bc)
                            :output *standard-output* :error *error-output*))))))
 
 (defun compile-unit (sexps base-module &key (outpath "./bitlisp.bc") main-unit?)
