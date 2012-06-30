@@ -203,7 +203,7 @@
 (defun constraint-eval (code &optional (env *primitives-env*))
   (destructuring-bind (interface &rest args) code
     (make-instance 'pred
-                   :interface (lookup interface :interface env)
+                   :interface (lookup interface :type env)
                    :args (mapcar (rcurry #'type-eval env) args))))
 
 (defun make-ftype (arg-type return-type)

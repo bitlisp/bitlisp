@@ -222,20 +222,17 @@
    (env)
    (assert (toplevel? env) () "Cannot change modules below the top level")
    (let ((import-modules (mapcar (rcurry #'lookup :value env) imports))
-         value-names type-names interface-names)
+         value-names type-names)
      (dolist (export exports)
        (if (atom export)
            (push export value-names)
            (cond
              ((eq (sym "type") (first export))
               (setf type-names (rest export)))
-             ((eq (sym "interface") (first export))
-              (setf interface-names (rest export)))
              (t (error "Unrecognized export type ~A" (first export))))))
      (let ((module (make-module name (module env) import-modules
                                 :value-exports value-names
-                                :type-exports type-names
-                                :interface-exports interface-names)))
+                                :type-exports type-names)))
        (values (list* self (lookup name :value env) import-modules exports)
                module))))
   (:infer (make-form (lookup "unit") (list* self name imports exports)))
@@ -286,7 +283,7 @@
                                     :name name
                                     :vars gens
                                     :supers preds)))
-     (bind env :interface name interface)
+     (bind env :type name interface)
      (loop :for (name type default) :in bindings
            :for resolved := (infer-kinds (type-resolve type subenv))
            :do (bind env :value name
@@ -305,14 +302,11 @@
   (:codegen (m b ty)
             (declare (ignore name vars supers bindings m b ty))))
 
-;; (defspecial "implement" self (interface types &rest values)
+;; (defspecial "implement" self (vars constraints interface &rest values)
 ;;   (:resolve
 ;;    (env)
 ;;    (let* ((subenv (make-subenv env))
 ;;           (args (mapcar (compose #'infer-kinds (rcurry #'type-resolve-free subenv)) types)))
-;;      (add-impl (lookup interface :interface env)
-;;                (mapcar #'constraint-eval constraints)
-;;                (mapcar #'type-construct args))
 ;;      (list* self interface types constraints values)))
 ;;   (:infer (make-form (lookup "Unit") (list* self interface type constraints)))
 ;;   (:codegen (module builder ctype) (error "TODO")))

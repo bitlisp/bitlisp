@@ -9,7 +9,6 @@
    (imports :initarg :imports :reader imports)
    (value-exports :initarg :value-exports :reader value-exports)
    (type-exports :initarg :type-exports :reader type-exports)
-   (interface-exports :initarg :interface-exports :reader interface-exports)
    (object :initarg :object :initform nil :reader object)))
 
 (defun module-fqn (module)
@@ -38,7 +37,7 @@
   (print-unreadable-object (module stream :type t)
     (princ (module-fqn module) stream)))
 
-(defun make-module (name parent imports &key env interface-exports type-exports value-exports)
+(defun make-module (name parent imports &key env type-exports value-exports)
   (let ((menv (or env
                   (make-instance 'environment
                                  :toplevel? t
@@ -48,8 +47,6 @@
     (dolist (import imports)
       (dolist (sym (value-exports import))
         (bind menv :value sym (lookup sym :value (env import))))
-      (dolist (sym (interface-exports import))
-        (bind menv :interface sym (lookup sym :interface (env import))))
       (dolist (sym (type-exports import))
         (bind menv :type sym (lookup sym :type (env import))))
       (dolist (implset (implementations (env import)))
@@ -62,8 +59,7 @@
                      :parent parent
                      :imports imports
                      :value-exports value-exports
-                     :type-exports type-exports
-                     :interface-exports interface-exports))
+                     :type-exports type-exports))
       (setf (module menv) mod)
       (bind (env parent) :value name mod))))
 

@@ -5,8 +5,6 @@
                    :initarg :value-bindings :reader value-bindings)
    (type-bindings :initform (make-hash-table :test 'eq)
                   :initarg :type-bindings :reader type-bindings)
-   (interface-bindings :initform (make-hash-table :test 'eq)
-                       :initarg :interface-bindings :reader interface-bindings)
    (implementations :initform nil :accessor implementations
                     :documentation "((interface . (impl1 impl2 ...)) ...) alist")
    (parents :initform () :initarg :parents :accessor parents)
@@ -29,8 +27,7 @@
 (defun env-bindings (env &optional (namespace :value))
   (ecase namespace
     (:value (value-bindings env))
-    (:type (type-bindings env))
-    (:interface (interface-bindings env))))
+    (:type (type-bindings env))))
 
 (defun %lookup (symbol &optional (namespace :value) (env *primitives-env*))
   (setf symbol (ensure-bl-sym symbol))

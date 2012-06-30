@@ -10,14 +10,14 @@
                        (list (make-instance 'pred
                                             :interface
                                             (if (= lit 0)
-                                                (lookup "abelian-group" :interface)
-                                                (lookup "ring" :interface))
+                                                (lookup "abelian-group" :type)
+                                                (lookup "ring" :type))
                                             :args (list var))))))
     (ratio (let ((var (make-instance 'tyvar :kind 1)))
              (values (make-form var lit)
                      (list (make-instance 'pred
                                           :interface
-                                          (lookup "division-ring" :interface)
+                                          (lookup "division-ring" :type)
                                           :args (list var))))))))
 
 (defun infer-expr-seq (exprs)
